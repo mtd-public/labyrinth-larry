@@ -14,6 +14,9 @@ floating virtual thumbstick, adapted from
 
 ## Play
 
+Play online: **https://mtd-public.github.io/labyrinth-larry/** (every push to
+`main` deploys via `.github/workflows/pages.yml`).
+
 There's no build step. Serve the folder and open it on a phone, or in a
 narrow desktop window:
 
