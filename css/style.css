@@ -21,6 +21,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   display: flex; justify-content: space-between; align-items: flex-start;
 }
 .score, .level {
+  white-space: nowrap;
   display: flex; flex-direction: column; background: var(--panel); border: 2px solid #5a1a10;
   border-radius: 6px; padding: 4px 10px; font-weight: 800; font-size: 18px; min-width: 76px;
 }
@@ -80,4 +81,31 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 .btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #3a0804; }
 .btn.ghost { background: transparent; border: 2px solid #6a1c10; box-shadow: none; font-size: 16px; padding: 10px 22px; margin-top: 10px; }
 .levels { display: flex; gap: 6px; justify-content: center; margin-top: 12px; flex-wrap: wrap; }
-.levels button { width: 40px; height: 40px; border-radius: 6px; border: 2px solid #6a1c10; background: #2a0a06; color: var(--bone); font-weight: 900; }
+.levels button {
+  width: 76px; padding: 6px 2px; border-radius: 6px; border: 2px solid #6a1c10; background: #2a0a06;
+  color: var(--bone); cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 1px;
+}
+.levels button b { font: 900 16px Impact, "Arial Black", sans-serif; color: var(--c); }
+.levels button span { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; }
+
+/* the Sin title card that opens every circle */
+.sin-intro {
+  position: absolute; left: 0; right: 0; top: 22%; text-align: center; padding: 0 16px;
+  opacity: 0; pointer-events: none; --accent: #ffd27a;
+}
+.sin-intro.show { animation: sinIn 3.2s ease-out forwards; }
+.sin-intro.show .sin { animation: sinSpread 0.6s ease-out; }
+@keyframes sinSpread { from { letter-spacing: 24px; } }
+.sin-intro .circle { font: 800 14px system-ui, sans-serif; letter-spacing: 6px; color: var(--bone); text-shadow: 0 1px 4px #000; }
+.sin-intro .sin {
+  font: 900 clamp(56px, 19vw, 120px)/1 Impact, "Arial Black", sans-serif; color: var(--accent);
+  letter-spacing: 4px; text-shadow: 0 0 24px var(--accent), 5px 5px 0 #000;
+}
+.sin-intro .title { font: 900 22px Impact, "Arial Black", sans-serif; letter-spacing: 2px; color: #fff4e0; text-shadow: 2px 2px 0 #000; }
+.sin-intro .quote { margin-top: 6px; font: italic 15px Georgia, serif; color: #e9c9a0; text-shadow: 0 1px 4px #000; }
+@keyframes sinIn {
+  0% { opacity: 0; transform: scale(1.6); filter: blur(6px); }
+  14% { opacity: 1; transform: scale(1); filter: blur(0); }
+  80% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-20px); }
+}

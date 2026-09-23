@@ -50,10 +50,11 @@ export function autopilot(idx) {
     const ev = b.step(w, dt, ax, az);
     if (ev.landed > maxFall) maxFall = ev.landed;
     if (ev.landed > FATAL_FALL) return { level: idx + 1, ok: false, why: `fatal fall ${ev.landed.toFixed(1)} at ${b.x.toFixed(1)},${b.z.toFixed(1)}`, t };
+    if (b.grounded && b.support && b.support.kind === 'lava') return { level: idx + 1, ok: false, why: `rolled into lava at ${(b.x / T).toFixed(1)},${(b.z / T).toFixed(1)}`, t };
     if (ev.abyss) return { level: idx + 1, ok: false, why: `fell into abyss near cell ${tgt.i},${tgt.j} (wp ${k}/${path.length})`, t };
     const g = w.surfaceAt(def.goal.i, def.goal.j);
     if (Math.hypot(g.x - b.x, g.z - b.z) < 1.5 && Math.abs(g.y - b.y) < 1) return { level: idx + 1, ok: true, t: +t.toFixed(1), cells: path.length, maxFall: +maxFall.toFixed(2), budget: def.time };
     t += dt;
   }
-  return { level: idx + 1, ok: false, why: `timeout at wp ${k}/${path.length}` };
+  return { level: idx + 1, ok: false, why: `timeout at wp ${k}/${path.length} (cell ${path[k].i},${path[k].j}), ball at ${(b.x / T).toFixed(1)},${(b.z / T).toFixed(1)} y ${b.y.toFixed(1)}` };
 }

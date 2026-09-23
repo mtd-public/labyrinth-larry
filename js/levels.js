@@ -8,7 +8,9 @@
 //   c  checkpoint rune    k  Lament box (+time)        o  soul orb spawns here
 //   S  spike trap         F  flame vent                L  lava (sunk, deadly)
 //   B  crumbling bone     H  hook swinging along x     V  hook swinging along z
-//   x  hole               r  skull pile (decor)        (space) leave untouched
+//   x  hole               r  skull pile (decor)        $  coin (+100)
+//   T  tar (Sloth: drags) ~  grease (Gluttony: slides)
+//   > < ^ v  wind tile blowing +x, -x, -z, +z (Lust)   (space) leave untouched
 import { T } from './world.js';
 
 class Builder {
@@ -17,7 +19,7 @@ class Builder {
     this.cells = new Array(W * D).fill(null);
     this.start = null; this.goal = null;
     this.torches = []; this.orbs = []; this.hooks = []; this.traps = [];
-    this.boxes = []; this.checkpoints = []; this.skulls = []; this.chains = [];
+    this.boxes = []; this.checkpoints = []; this.skulls = []; this.chains = []; this.coins = [];
   }
   _set(i, j, cell) {
     if (i < 0 || j < 0 || i >= this.W || j >= this.D) throw new Error(`cell ${i},${j} out of bounds`);
@@ -52,7 +54,11 @@ class Builder {
       case 'B': this.flat(i, j, h, 'bone'); return;
       case 'g': this.flat(i, j, h, 'goal'); return;
       case 'P': this.flat(i, j, h, 'goal'); this.goal = at; return;
+      case 'T': this.flat(i, j, h, 'tar'); return;
+      case '~': this.flat(i, j, h, 'slick'); return;
     }
+    const wind = { '>': [1, 0], '<': [-1, 0], '^': [0, -1], 'v': [0, 1] }[ch];
+    if (wind) { this.flat(i, j, h, 'wind'); this.cells[j * this.W + i].wind = wind; return; }
     this.flat(i, j, h);
     switch (ch) {
       case '@': this.start = at; break;
@@ -64,6 +70,7 @@ class Builder {
       case 'H': this.hooks.push({ ...at, axis: 'x' }); break;
       case 'V': this.hooks.push({ ...at, axis: 'z' }); break;
       case 'r': this.skulls.push(at); break;
+      case '$': this.coins.push(at); break;
       case '.': break;
       default: throw new Error(`unknown glyph ${ch}`);
     }
@@ -73,27 +80,28 @@ class Builder {
   chain(i, j, h) { this.chains.push({ i, j, h }); return this; }
 
   done(meta) {
-    if (!this.start || !this.goal) throw new Error(`${meta.name}: needs @ and P`);
+    if (!this.start || !this.goal) throw new Error("level needs @ and P");
     return { ...meta, W: this.W, D: this.D, cells: this.cells, start: this.start, goal: this.goal,
       torches: this.torches, orbs: this.orbs, hooks: this.hooks, traps: this.traps, boxes: this.boxes,
-      checkpoints: this.checkpoints, skulls: this.skulls, chains: this.chains };
+      checkpoints: this.checkpoints, skulls: this.skulls, chains: this.chains, coins: this.coins };
   }
 }
 
+// One level per deadly sin, in the same order as SINS (js/sins.js).
 export const LEVELS = [
-  // 1 — a gentle course that teaches ramps and safe drops.
+  // I. Pride: a gentle spire that teaches ramps, safe drops and the edges.
   () => new Builder(24, 24)
     .map(1, 1, 14, [
       't...t',
       '.....',
       '..@..',
-      '.....',
+      '..$..',
       'r....',
     ])
     .map(6, 1, 14, [
       '  t  t',
       '......',
-      '......',
+      '...$..',
       '......',
     ])
     .ramp(9, 5, 3, 4, 14, 10, 'z')
@@ -101,12 +109,12 @@ export const LEVELS = [
       't.......',
       '...c....',
       '........',
-      '.k.....r',
+      '.k.$...r',
     ])
     .map(14, 8, 8, [
       ' t  ',
       '....',
-      '....',
+      '..$.',
       '....',
       '....',
     ])
@@ -119,9 +127,9 @@ export const LEVELS = [
       '......t.....',
     ])
     .chain(3, 8, 14).chain(12, 6, 12).chain(19, 12, 8).chain(9, 16, 6)
-    .done({ name: 'The Threshold', sub: 'Mind the edges, Larry.', time: 45 }),
+    .done({ time: 45 }),
 
-  // 2 — soul orbs hunt you across the Fields of Asphodel; bone bridges give way.
+  // II. Envy: soul orbs covet the cage and roll after you; bone bridges give way.
   () => new Builder(28, 28)
     .map(1, 1, 18, [
       't..t',
@@ -129,7 +137,7 @@ export const LEVELS = [
       '....',
       't...',
     ])
-    .map(5, 2, 18, ['......'])
+    .map(5, 2, 18, ['..$...'])
     .map(11, 1, 18, [
       't..t',
       '....',
@@ -142,7 +150,7 @@ export const LEVELS = [
       '.o...c....o.',
       '............',
       '...r....k...',
-      '............',
+      '..$......$..',
     ])
     .map(12, 15, 13, [
       'BB',
@@ -152,7 +160,7 @@ export const LEVELS = [
     ])
     .map(10, 19, 13, [
       '........',
-      '........',
+      '...$....',
       't......t',
     ])
     .map(18, 19, 11, [
@@ -172,9 +180,9 @@ export const LEVELS = [
       '....ggggg.',
     ])
     .chain(8, 4, 18).chain(16, 8, 14).chain(4, 14, 13).chain(20, 16, 12)
-    .done({ name: 'Asphodel Descent', sub: 'The damned roll after you.', time: 45 }),
+    .done({ time: 45 }),
 
-  // 3 — Hellraiser: hooks and chains swing across narrow walkways.
+  // III. Wrath: Hellraiser hooks swing across narrow walkways; spikes and fire.
   () => new Builder(30, 30)
     .map(1, 1, 20, [
       't..t',
@@ -187,7 +195,7 @@ export const LEVELS = [
       '..',
       'H.',
       '..',
-      '..',
+      '.$',
       '.H',
       '..',
       '..',
@@ -210,7 +218,7 @@ export const LEVELS = [
     .map(18, 15, 15, ['...V.V'])
     .map(22, 16, 15, [
       '.....',
-      '..c..',
+      '.Fc..',
       '.....',
       't...t',
     ])
@@ -218,13 +226,112 @@ export const LEVELS = [
     .map(19, 25, 9, [
       't..........',
       '..H.gggg...',
-      '....ggPg...',
+      '....ggPg.$.',
       'r...gggg..t',
     ])
     .chain(6, 3, 20).chain(10, 10, 18).chain(20, 11, 15).chain(18, 22, 12).chain(26, 14, 15)
-    .done({ name: "Leviathan's Chains", sub: 'The hooks are hungry.', time: 50 }),
+    .done({ time: 50 }),
 
-  // 4 — Phlegethon: a river of fire, flame vents, bone bridges over lava.
+  // IV. Sloth: tar pits drain your speed. Carry momentum down the ramps.
+  () => new Builder(28, 30)
+    .map(1, 1, 20, [
+      't..t',
+      '.@..',
+      '....',
+      '....',
+    ])
+    .ramp(1, 5, 4, 3, 20, 17, 'z')
+    .map(1, 8, 17, [
+      't........t',
+      '..TTTTTT..',
+      '.TTTTTTTT.',
+      '.TTTTkTTT.',
+      '..TTTTTT..',
+      't...c...$.',
+    ])
+    .ramp(11, 11, 4, 3, 17, 13, 'x')
+    .map(15, 10, 13, [
+      't..TT.t',
+      '...TT..',
+      '...TT..',
+      '...TT.c',
+      '..$TT..',
+      '...TT..',
+      't..TT..',
+    ])
+    .map(20, 17, 13, [
+      'BB',
+      'BB',
+      'BB',
+      'BB',
+    ])
+    .map(18, 21, 13, [
+      't.....',
+      '.TTTT.',
+      '..$...',
+    ])
+    .ramp(19, 24, 3, 3, 13, 9, 'z')
+    .map(16, 27, 9, [
+      't..ggg..t',
+      '...gPg...',
+      'r..ggg..r',
+    ])
+    .chain(7, 5, 20).chain(13, 8, 17).chain(24, 14, 13).chain(16, 24, 11)
+    .done({ time: 55 }),
+
+  // V. Greed: coins glitter on spurs off narrow ledges. Is it worth it?
+  () => new Builder(30, 28)
+    .map(1, 1, 22, [
+      't...t',
+      '..@..',
+      '.....',
+      't.$.t',
+    ])
+    .map(2, 5, 22, [
+      ' . ',
+      ' .$',
+      ' . ',
+      ' . ',
+      '$. ',
+      ' . ',
+      ' .$',
+      ' . ',
+    ])
+    .map(1, 13, 22, [
+      't....t',
+      '..c...',
+      '......',
+      '.k..$.',
+    ])
+    .ramp(7, 14, 4, 2, 22, 18, 'x')
+    .map(11, 12, 18, [
+      't.....t',
+      '.$...$.',
+      '...o...',
+      '.......',
+      '.$...$.',
+      't.....t',
+    ])
+    .map(18, 15, 18, ['..$..$'])
+    .map(24, 13, 18, [
+      't...t',
+      '...$.',
+      '..c..',
+      '.....',
+      '.....',
+      't...t',
+    ])
+    .ramp(25, 19, 3, 4, 18, 13, 'z')
+    .map(19, 23, 13, [
+      't.........',
+      '.$..gggg..',
+      '....ggPg..',
+      't.k.gggg.t',
+    ])
+    .chain(8, 4, 22).chain(14, 9, 18).chain(22, 11, 18).chain(20, 20, 14)
+    .done({ time: 55 }),
+
+  // VI. Gluttony: a river of boiling fat, greasy floors and flame vents.
   () => new Builder(30, 32)
     .map(1, 1, 22, [
       't...t',
@@ -235,20 +342,20 @@ export const LEVELS = [
     .ramp(2, 5, 3, 4, 22, 18, 'z')
     .map(1, 9, 18, [
       't..........t',
-      '............',
+      '..~~~~~~~...',
       'LLLLL.LLLLLL',
       'LLLLLFLLLLLL',
-      '..c.......o.',
-      'r...........',
+      '..c....~~~o.',
+      'r.....~~~$..',
     ])
     .ramp(13, 12, 4, 3, 18, 13, 'x')
     .map(17, 10, 13, [
       't.....t',
       '.c.....',
-      '..LL...',
-      '..LL...',
-      '.......',
-      'F..o..F',
+      '...~~..',
+      '...~~..',
+      '.....LL',
+      'F..o.LL',
       '.......',
       '..k.   ',
     ])
@@ -261,7 +368,7 @@ export const LEVELS = [
     .map(16, 22, 13, [
       't.........',
       '..F.F.F...',
-      '.........t',
+      '...~~~...t',
     ])
     .map(26, 22, 11, [
       '...',
@@ -272,12 +379,12 @@ export const LEVELS = [
     .map(20, 28, 7, [
       't...gggg.',
       '..o.ggPg.',
-      '....gggg.',
+      '$...gggg.',
     ])
     .chain(8, 6, 20).chain(15, 9, 16).chain(24, 8, 14).chain(14, 25, 12)
-    .done({ name: 'River Phlegethon', sub: 'Everything down here burns.', time: 55 }),
+    .done({ time: 55 }),
 
-  // 5 — the labyrinth itself: two walled mazes stacked down a cliff.
+  // VII. Lust: the labyrinth itself, swept by the winds of desire.
   () => new Builder(32, 32)
     .map(1, 1, 24, [
       't#########t',
@@ -285,11 +392,11 @@ export const LEVELS = [
       '#.#.#.###.#',
       '#.#...#k#.#',
       '#.#####.#.#',
-      '#.....#...#',
+      '#.<<<.#...#',
       '###.#.###.#',
       '#...#...#.#',
       '#.#####.#.#',
-      '#......c#.#',
+      '#.>>>>.c#.#',
       't#######...',
     ])
     .ramp(9, 12, 3, 4, 24, 19, 'z')
@@ -307,16 +414,16 @@ export const LEVELS = [
     .ramp(22, 22, 4, 3, 19, 13, 'x')
     .map(26, 18, 13, [
       't...t',
-      '.....',
+      '.$...',
       '..c..',
       '.....',
       '..H..',
-      '.....',
+      '.>>>.',
       '.ggg.',
       '.gPg.',
       '.ggg.',
       't...t',
     ])
     .chain(14, 6, 24).chain(22, 12, 20).chain(4, 20, 18).chain(29, 14, 16)
-    .done({ name: 'The Labyrinth', sub: 'No one leaves. Except Larry.', time: 65 }),
+    .done({ time: 70 }),
 ];

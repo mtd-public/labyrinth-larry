@@ -2,6 +2,7 @@ import { T, STEP } from './world.js';
 
 export const G = 26;           // gravity, world units / s^2
 export const FATAL_FALL = 4.6; // falling further than this breaks Larry
+export const WIND = 13;        // push from a wind tile (Lust)
 const ROLL = 5 / 7;            // a rolling sphere feels 5/7 of the slope pull
 const SNAP = 0.35;             // ground this close below stays "attached"
 
@@ -32,13 +33,18 @@ export class Body {
     const ev = { wallHit: 0, landed: -1, abyss: false, prevX: this.x, prevZ: this.z };
     if (this.grounded) {
       const c = world.cellAtXZ(this.x, this.z);
-      let ax = ix * this.accel, az = iz * this.accel;
+      // surface: tar (Sloth) drags, grease (Gluttony) slides, wind (Lust) shoves
+      let acc = this.accel, fr = this.friction;
+      if (c && c.kind === 'tar') { acc *= 0.55; fr = 3.2; }
+      if (c && c.kind === 'slick') { acc *= 0.4; fr = 0.04; }
+      let ax = ix * acc, az = iz * acc;
+      if (c && c.wind) { ax += c.wind[0] * WIND; az += c.wind[1] * WIND; }
       if (c) {
         const k = G * ROLL / (1 + c.sx * c.sx + c.sz * c.sz);
         ax -= c.sx * k; az -= c.sz * k;
       }
       this.vx += ax * dt; this.vz += az * dt;
-      const f = Math.exp(-this.friction * dt);
+      const f = Math.exp(-fr * dt);
       this.vx *= f; this.vz *= f;
     } else {
       this.vx += ix * this.accel * this.airControl * dt;

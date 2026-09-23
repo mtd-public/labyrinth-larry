@@ -47,16 +47,18 @@ export class World {
   }
 
   // ---------------------------------------------------------------- meshes
-  build(scene) {
+  build(scene, theme) {
     const floorTex = flagstoneTexture(), wallTex = brickTexture();
     this.floorMat = new THREE.MeshLambertMaterial({ map: floorTex, vertexColors: true });
     this.wallMat = new THREE.MeshLambertMaterial({ map: wallTex, vertexColors: true });
     const top = new Geo(), side = new Geo(), lava = new Geo();
     const tint = (c) => {
       const base = { stone: [1, 0.95, 0.9], ramp: [0.62, 0.56, 0.54], wall: [0.72, 0.6, 0.58],
-        goal: [0.95, 0.55, 0.45], bone: [1, 1, 1] }[c.kind] || [1, 1, 1];
+        goal: [0.95, 0.55, 0.45], bone: [1, 1, 1], tar: [0.2, 0.17, 0.16], slick: [1.35, 1.2, 0.3],
+        wind: [0.85, 0.8, 0.85] }[c.kind] || [1, 1, 1];
+      const th = c.kind === 'wall' ? theme.wall : theme.floor;
       const n = 0.92 + ((c.i * 73 + c.j * 151) % 17) / 17 * 0.12;
-      return base.map((v) => v * n);
+      return base.map((v, k) => v * n * th[k]);
     };
     const span = (this.maxH - this.bottomY) || 1;
     const shade = (y) => 0.22 + 0.78 * Math.max(0, (y - this.bottomY) / span) ** 1.5;
@@ -99,12 +101,12 @@ export class World {
     this.group.add(new THREE.Mesh(top.geometry(), this.floorMat));
     this.group.add(new THREE.Mesh(side.geometry(), this.wallMat));
     if (lava.count) {
-      this.lavaTileMat = makeLavaMaterial(0.9);
+      this.lavaTileMat = makeLavaMaterial(0.9, 1, theme);
       this.group.add(new THREE.Mesh(lava.geometry(), this.lavaTileMat));
     }
     // the sea of fire below
     const cx = this.W * T / 2, cz = this.D * T / 2, R = Math.max(this.W, this.D) * T * 3;
-    this.lavaMat = makeLavaMaterial(0.55, 0.5);
+    this.lavaMat = makeLavaMaterial(0.55, 0.5, theme);
     const sea = new THREE.Mesh(new THREE.PlaneGeometry(R, R), this.lavaMat);
     sea.rotation.x = -Math.PI / 2; sea.position.set(cx, this.lavaY, cz);
     this.group.add(sea);
@@ -154,9 +156,11 @@ class Geo {
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 
 // Flowing, self-lit lava: layered value noise, domain-warped by time.
-export function makeLavaMaterial(scale, bright = 1) {
+export function makeLavaMaterial(scale, bright = 1, theme = null) {
+  const hot = theme ? theme.lavaHot : [1.0, 0.85, 0.3], mid = theme ? theme.lavaMid : [1.0, 0.35, 0.03];
   return new THREE.ShaderMaterial({
-    uniforms: { uTime: { value: 0 }, uScale: { value: scale }, uBright: { value: bright } },
+    uniforms: { uTime: { value: 0 }, uScale: { value: scale }, uBright: { value: bright },
+      uHot: { value: new THREE.Vector3(...hot) }, uMid: { value: new THREE.Vector3(...mid) } },
     vertexShader: `
       varying vec2 vW;
       void main() {
@@ -165,7 +169,7 @@ export function makeLavaMaterial(scale, bright = 1) {
         gl_Position = projectionMatrix * viewMatrix * w;
       }`,
     fragmentShader: `
-      uniform float uTime; uniform float uScale; uniform float uBright;
+      uniform float uTime; uniform float uScale; uniform float uBright; uniform vec3 uHot; uniform vec3 uMid;
       varying vec2 vW;
       float h(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
       float n(vec2 p) {
@@ -178,8 +182,8 @@ export function makeLavaMaterial(scale, bright = 1) {
         vec2 q = vec2(fbm(p + uTime * 0.05), fbm(p + vec2(5.2, 1.3) - uTime * 0.04));
         float f = fbm(p * 1.6 + q * 2.5 + uTime * 0.03);
         float crust = uBright < 0.99 ? smoothstep(0.2, 0.32, f) : smoothstep(0.42, 0.6, f);
-        vec3 hot = mix(vec3(1.0, 0.85, 0.3), vec3(1.0, 0.35, 0.03), smoothstep(0.1, 0.45, f));
-        vec3 col = mix(hot, vec3(0.13, 0.03, 0.02), crust);
+        vec3 hot = mix(uHot, uMid, smoothstep(0.1, 0.45, f));
+        vec3 col = mix(hot, uMid * 0.14 + vec3(0.03), crust);
         col *= 0.85 + 0.25 * sin(uTime * 1.7 + f * 9.0);
         gl_FragColor = vec4(col * uBright, 1.0);
         #include <colorspace_fragment>

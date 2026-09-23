@@ -11,13 +11,13 @@ const add = (map, color = 0xffffff, opacity = 1) => new THREE.SpriteMaterial({
 
 // A cluster of additive sprites that flickers like fire.
 class Flame {
-  constructor(size = 1) {
+  constructor(size = 1, flame = 0xff7a20, core = 0xffe0a0) {
     this.group = new THREE.Group(); this.size = size; this.parts = [];
     for (let k = 0; k < 4; k++) {
-      const s = new THREE.Sprite(add(glow, k ? 0xff7a20 : 0xffe0a0, k ? 0.8 : 1));
+      const s = new THREE.Sprite(add(glow, k ? flame : core, k ? 0.8 : 1));
       this.group.add(s); this.parts.push({ s, ph: Math.random() * 6, k });
     }
-    const halo = new THREE.Sprite(add(redGlow, 0xff5010, 0.35));
+    const halo = new THREE.Sprite(add(redGlow, flame, 0.35));
     halo.scale.setScalar(size * 3.2); this.group.add(halo); this.halo = halo;
   }
   update(t, intensity = 1) {
@@ -33,13 +33,13 @@ class Flame {
 
 // Standing brazier on top of a wall block. Real lights come from a pool.
 export class Torch {
-  constructor(pos) {
+  constructor(pos, theme) {
     this.pos = pos.clone();
     this.group = new THREE.Group(); this.group.position.copy(pos);
     const post = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.14, 1.2, 6), IRON); post.position.y = 0.6;
     const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.18, 0.3, 8, 1, true), IRON); bowl.position.y = 1.3;
     bowl.material = new THREE.MeshLambertMaterial({ color: 0x2a2422, side: THREE.DoubleSide });
-    const coals = new THREE.Mesh(new THREE.CircleGeometry(0.38, 8), new THREE.MeshBasicMaterial({ color: 0xff5a10 }));
+    const coals = new THREE.Mesh(new THREE.CircleGeometry(0.38, 8), new THREE.MeshBasicMaterial({ color: theme.flame }));
     coals.rotation.x = -Math.PI / 2; coals.position.y = 1.4;
     for (let k = 0; k < 4; k++) { // horns on the bowl
       const horn = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.35, 5), IRON);
@@ -48,7 +48,7 @@ export class Torch {
       horn.rotation.set(Math.sin(a) * 0.5, 0, -Math.cos(a) * 0.5);
       this.group.add(horn);
     }
-    this.flame = new Flame(1.3); this.flame.group.position.y = 1.4;
+    this.flame = new Flame(1.3, theme.flame, theme.core); this.flame.group.position.y = 1.4;
     this.group.add(post, bowl, coals, this.flame.group);
     this.lightPos = pos.clone().add(new THREE.Vector3(0, 2.2, 0));
     this.ph = Math.random() * 10;
@@ -368,4 +368,60 @@ export class HangingChain {
     this.ph = Math.random() * 6;
   }
   update(t) { this.group.rotation.z = Math.sin(t * 0.7 + this.ph) * 0.06; this.group.rotation.x = Math.cos(t * 0.5 + this.ph) * 0.04; }
+}
+
+// A spinning gold coin (+100). Greed puts them where it hurts.
+const coinMat = new THREE.MeshPhongMaterial({ color: 0xffc830, specular: 0xfff0a0, shininess: 100, emissive: 0x4a3000 });
+const coinGeo = new THREE.CylinderGeometry(0.34, 0.34, 0.08, 16);
+export class Coin {
+  constructor(pos) {
+    this.pos = pos.clone(); this.taken = false;
+    this.mesh = new THREE.Mesh(coinGeo, coinMat);
+    this.mesh.rotation.x = Math.PI / 2; this.mesh.position.copy(pos);
+    this.ph = Math.random() * 6;
+  }
+  update(t) {
+    this.mesh.visible = !this.taken;
+    this.mesh.position.y = this.pos.y + 0.7 + Math.sin(t * 3 + this.ph) * 0.1;
+    this.mesh.rotation.z = t * 3 + this.ph;
+  }
+}
+
+// Wind tile (Lust): pale arrows streaming across the floor in the push direction.
+let windTex = null;
+function windTexture() {
+  if (windTex) return windTex;
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const g = c.getContext('2d');
+  g.strokeStyle = 'rgba(255,200,240,0.9)'; g.lineWidth = 6; g.lineCap = 'round';
+  for (const y of [18, 46]) { g.beginPath(); g.moveTo(14, y - 10); g.lineTo(30, y); g.lineTo(14, y + 10); g.stroke(); }
+  g.beginPath(); g.moveTo(40, 22); g.lineTo(52, 32); g.lineTo(40, 42); g.stroke();
+  windTex = new THREE.CanvasTexture(c); windTex.wrapS = windTex.wrapT = THREE.RepeatWrapping;
+  return windTex;
+}
+export class WindTile {
+  constructor(pos, dir) {
+    const tex = windTexture().clone(); tex.needsUpdate = true;
+    this.tex = tex;
+    this.mesh = new THREE.Mesh(new THREE.PlaneGeometry(T * 0.96, T * 0.96), new THREE.MeshBasicMaterial({
+      map: tex, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false }));
+    this.mesh.rotation.x = -Math.PI / 2;
+    // the texture's arrows point +u; turn the plane so +u matches the wind
+    this.mesh.rotation.z = -Math.atan2(dir[1], dir[0]);
+    this.mesh.position.copy(pos); this.mesh.position.y += 0.05;
+  }
+  update(t) { this.tex.offset.x = -t * 1.6; this.mesh.material.opacity = 0.45 + 0.15 * Math.sin(t * 5); }
+}
+
+// Grease tile (Gluttony): a wet, pulsing sheen so the slippery floor reads.
+const sheenTex = glowTexture('rgba(255,250,200,0.9)', 'rgba(255,220,80,0)');
+export class GreaseTile {
+  constructor(pos) {
+    this.mesh = new THREE.Mesh(new THREE.PlaneGeometry(T * 1.1, T * 1.1), new THREE.MeshBasicMaterial({
+      map: sheenTex, color: 0xf0e060, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending, depthWrite: false }));
+    this.mesh.rotation.x = -Math.PI / 2;
+    this.mesh.position.copy(pos); this.mesh.position.y += 0.04;
+    this.ph = pos.x * 0.7 + pos.z * 0.3;
+  }
+  update(t) { this.mesh.material.opacity = 0.3 + 0.18 * Math.sin(t * 2.5 + this.ph); }
 }
