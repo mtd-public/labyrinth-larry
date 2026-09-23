@@ -13,7 +13,7 @@ export class Larry {
     this.root.add(this.cage, this.man);
     this._buildCage();
     this._buildMan();
-    markRole(this.cage, 'paper'); markRole(this.man, 'paper'); // beanie stays accent (marked first)
+    markRole(this.cage, 'paper'); markRole(this.man, 'hero'); // cage solid white; body white with a dithered shadow; beanie stays accent (marked first)
     this.heading = 0; this.runPhase = 0; this.squash = 1;
   }
 

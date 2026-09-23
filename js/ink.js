@@ -45,12 +45,30 @@ const MONO = `if (uInk > 0.5) gl_FragColor.rgb = vec3(dot(gl_FragColor.rgb, vec3
 const ACCENT = `if (uInk > 0.5) gl_FragColor.rgb = vec3(max(gl_FragColor.r, max(gl_FragColor.g, gl_FragColor.b)), 0.0, 0.0);`;
 // the hero: flat paper, so the player pops as a white figure (Sin City's backlit silhouettes)
 const PAPER = `if (uInk > 0.5) gl_FragColor.rgb = vec3(1.0);`;
+// the hero's body: paper, but the shadowed side gets a 4x4 ordered dither with
+// 45% of its pixels inked. Shade is lit brightness over albedo, so dark skin or
+// cloth isn't mistaken for shadow. Pixels come in 2x2 device-pixel blocks.
+export const HERO_SHADOW = { threshold: 0.55, coverage: 0.45 };
+const HERO = `if (uInk > 0.5) {
+  float albedo = max(dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114)), 0.02);
+  float lit = pow(max(dot(gl_FragColor.rgb, vec3(0.299, 0.587, 0.114)), 0.0), 2.2); // back to linear
+  float shade = lit / albedo;
+  vec2 q = floor(gl_FragCoord.xy / 2.0);
+  vec2 h = floor(q * 0.5);
+  float b2a = fract(dot(mod(q, 2.0), vec2(0.5, mod(q.y, 2.0) * 0.75)));
+  float b2b = fract(dot(mod(h, 2.0), vec2(0.5, mod(h.y, 2.0) * 0.75)));
+  float bayer = b2a + b2b * 0.25 + 1.0 / 32.0;         // cell centres: 16 levels in (0, 1)
+  // coverage 0.45 -> 7 of 16 cells inked (43.75%, the nearest a 4x4 pattern allows)
+  float inkDot = step(shade, ${HERO_SHADOW.threshold.toFixed(2)}) * (1.0 - step(${HERO_SHADOW.coverage.toFixed(2)}, bayer));
+  gl_FragColor.rgb = vec3(1.0 - inkDot);
+}`;
 
 // Tag an object as hidden in ink mode (soft glows and halos: ink has no blur).
 export function inkHide(obj) { obj.userData.inkHide = true; return obj; }
 
 // Give an object (and everything under it) or a material an ink role:
-// 'accent' (the one colour), 'paper' (flat white hero) or the default 'mono'.
+// 'accent' (the one colour), 'paper' (flat white), 'hero' (white with a dithered
+// shadow; lit materials only, it reads diffuseColor) or the default 'mono'.
 export function markRole(target, role) {
   const set = (m) => { if (!m.userData.ink) m.userData.ink = role; };
   if (target.isMaterial) set(target);
@@ -63,7 +81,7 @@ function patch(m) {
   if (m.userData.inkPatched || m.isShaderMaterial) return;
   m.userData.inkPatched = true;
   const role = m.userData.ink || 'mono';
-  const code = { accent: ACCENT, paper: PAPER, mono: MONO }[role];
+  const code = { accent: ACCENT, paper: PAPER, hero: HERO, mono: MONO }[role];
   m.onBeforeCompile = (sh) => {
     sh.uniforms.uInk = inkUniform;
     sh.fragmentShader = 'uniform float uInk;\n' + sh.fragmentShader.replace(
