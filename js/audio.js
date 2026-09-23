@@ -107,6 +107,7 @@ export class Sfx {
   sizzle() { this._burst(0.9, 3000, 0.5, 0.25, 'highpass'); }
   crumble() { this._burst(0.4, 900, 1, 0.25); this._tone(140, 0.3, 'triangle', 0.06, -60); }
   hook() { this._tone(900, 0.15, 'square', 0.05, 900); this._burst(0.15, 4000, 3, 0.2); }
+  coin() { this._tone(988, 0.07, 'square', 0.05); this._tone(1319, 0.14, 'square', 0.05, 0, 0.06); }
   pickup() { [523, 659, 784, 1047].forEach((f, i) => this._tone(f, 0.14, 'triangle', 0.08, 0, i * 0.06)); }
   checkpoint() { [392, 523, 784].forEach((f, i) => this._tone(f, 0.25, 'sine', 0.1, 0, i * 0.09)); }
   portal() {

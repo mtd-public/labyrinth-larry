@@ -1,0 +1,68 @@
+// The seven circles, one per deadly sin, in Dante's order of the terraces.
+// Each sin tints the dungeon (stone, walls, fog, torchlight, the sea of fire)
+// and names the title card that introduces the level.
+export const SINS = [
+  {
+    sin: 'Pride', numeral: 'I', title: 'The Vaunted Spire',
+    quote: 'Pride goeth before a fall. So does Larry.',
+    accent: '#ffcf5a',
+    floor: [1.05, 0.95, 0.85], wall: [0.8, 0.7, 0.9],
+    fog: 0x160a1e, sky: 0x7a64a0, ground: 0x6a3a10,
+    torch: 0xffc060, flame: 0xffa020, core: 0xfff0c0,
+    lavaHot: [1.0, 0.85, 0.4], lavaMid: [0.9, 0.35, 0.05],
+  },
+  {
+    sin: 'Envy', numeral: 'II', title: 'The Green-Eyed Fields',
+    quote: 'The damned covet your cage. They roll after you.',
+    accent: '#6aff7a',
+    floor: [0.82, 0.95, 0.8], wall: [0.55, 0.72, 0.6],
+    fog: 0x031408, sky: 0x4a7a5a, ground: 0x1a4a10,
+    torch: 0x6aff7a, flame: 0x30d040, core: 0xd0ffd0,
+    lavaHot: [0.7, 1.0, 0.4], lavaMid: [0.08, 0.55, 0.1],
+  },
+  {
+    sin: 'Wrath', numeral: 'III', title: 'The Chained Rage',
+    quote: 'The hooks are furious. So is Larry.',
+    accent: '#ff3a2a',
+    floor: [1.0, 0.8, 0.75], wall: [0.85, 0.5, 0.45],
+    fog: 0x1e0202, sky: 0x7a4050, ground: 0x7a1a08,
+    torch: 0xff4a20, flame: 0xff3010, core: 0xffc0a0,
+    lavaHot: [1.0, 0.5, 0.2], lavaMid: [0.8, 0.04, 0.0],
+  },
+  {
+    sin: 'Sloth', numeral: 'IV', title: 'The Tar Pits of Acedia',
+    quote: 'Keep rolling. Whoever stops here stays forever.',
+    accent: '#9ab0ff',
+    floor: [0.78, 0.82, 0.92], wall: [0.55, 0.6, 0.72],
+    fog: 0x0a0e18, sky: 0x5a6a90, ground: 0x2a2a4a,
+    torch: 0x9ab0ff, flame: 0x6070ff, core: 0xe0e8ff,
+    lavaHot: [0.6, 0.7, 1.0], lavaMid: [0.12, 0.18, 0.6],
+  },
+  {
+    sin: 'Greed', numeral: 'V', title: 'The Gilded Ledges',
+    quote: 'Every coin sits one roll from the edge.',
+    accent: '#ffd040',
+    floor: [1.1, 0.95, 0.68], wall: [0.85, 0.7, 0.45],
+    fog: 0x1a1204, sky: 0x8a7a40, ground: 0x6a4a08,
+    torch: 0xffd040, flame: 0xffb010, core: 0xfff4c0,
+    lavaHot: [1.0, 0.95, 0.5], lavaMid: [0.9, 0.55, 0.05],
+  },
+  {
+    sin: 'Gluttony', numeral: 'VI', title: 'The River of Grease',
+    quote: 'Slick floors, boiling fat, and nothing ever fills you.',
+    accent: '#c8e040',
+    floor: [0.95, 0.9, 0.66], wall: [0.7, 0.6, 0.4],
+    fog: 0x141004, sky: 0x7a7a40, ground: 0x5a4a08,
+    torch: 0xd0ff40, flame: 0xa0c010, core: 0xf8ffc0,
+    lavaHot: [0.95, 0.9, 0.3], lavaMid: [0.55, 0.42, 0.02],
+  },
+  {
+    sin: 'Lust', numeral: 'VII', title: 'The Tempest Labyrinth',
+    quote: 'The winds of desire never stop blowing.',
+    accent: '#ff5ac8',
+    floor: [1.0, 0.82, 0.92], wall: [0.8, 0.5, 0.7],
+    fog: 0x1a0414, sky: 0x8a4a80, ground: 0x6a1040,
+    torch: 0xff50c0, flame: 0xff3090, core: 0xffd0f0,
+    lavaHot: [1.0, 0.6, 0.85], lavaMid: [0.7, 0.04, 0.4],
+  },
+];

@@ -3,10 +3,11 @@ import { World, T } from './world.js';
 import { Body, collideBodies, FATAL_FALL } from './physics.js';
 import { Larry } from './larry.js';
 import { LEVELS } from './levels.js';
+import { SINS } from './sins.js';
 import { InputManager } from './input.js';
 import { Sfx } from './audio.js';
 import { glowTexture } from './textures.js';
-import { Torch, Hellmouth, Checkpoint, LamentBox, OrbMesh, Hook, Trap, BoneSlab, skullPile, HangingChain, Embers } from './props.js';
+import { Torch, Hellmouth, Checkpoint, LamentBox, OrbMesh, Hook, Trap, BoneSlab, skullPile, HangingChain, Embers, Coin, WindTile, GreaseTile } from './props.js';
 
 const PLAYER_R = 0.8, ORB_R = 0.6;
 const LIGHTS = 6;           // real point lights, shared by the nearest torches
@@ -44,7 +45,7 @@ addEventListener('resize', resize); resize();
 const SCREEN_RIGHT = new THREE.Vector3(1, 0, -1).normalize();
 const SCREEN_UP = new THREE.Vector3(-1, 0, -1).normalize();
 
-scene.add(new THREE.HemisphereLight(0x6a5a88, 0x7a2a10, 1.4));
+const hemi = new THREE.HemisphereLight(0x6a5a88, 0x7a2a10, 1.4); scene.add(hemi);
 const moon = new THREE.DirectionalLight(0xa08cc8, 0.9); moon.position.set(-3, 10, 4); scene.add(moon);
 const lightPool = [];
 for (let k = 0; k < LIGHTS; k++) {
@@ -66,7 +67,7 @@ const fill = new THREE.PointLight(0xffb070, 14, 7, 1.2); scene.add(fill);
 const G = {
   state: 'title', levelIdx: 0, score: 0, time: 60, t: 0,
   level: null, world: null, root: null, torches: [], checkpoints: [], boxes: [], orbs: [], hooks: [],
-  traps: [], bones: [], chains: [], mouth: null, spawn: null, stateT: 0, deathMsg: '',
+  traps: [], bones: [], chains: [], coins: [], winds: [], mouth: null, spawn: null, stateT: 0, deathMsg: '',
   screamCD: 1.5, hookCD: 0, lastTick: 0, paused: false,
 };
 
@@ -76,13 +77,17 @@ const hud = $('hud'), screen = $('screen'), card = $('card'), toast = $('toast')
 function loadLevel(idx) {
   if (G.root) { scene.remove(G.root); G.world.dispose(scene); }
   G.levelIdx = idx;
-  const def = LEVELS[idx]();
+  const def = { ...LEVELS[idx](), ...SINS[idx] };
   G.level = def;
-  const world = new World(def); world.build(scene); G.world = world;
+  // the sin sets the mood: fog, ambient bounce, torchlight
+  scene.fog.color.setHex(def.fog); renderer.setClearColor(new THREE.Color(def.fog).multiplyScalar(0.55));
+  hemi.color.setHex(def.sky); hemi.groundColor.setHex(def.ground);
+  for (const l of lightPool) l.color.setHex(def.torch);
+  const world = new World(def); world.build(scene, def); G.world = world;
   const root = new THREE.Group(); scene.add(root); G.root = root;
   const top = (a) => world.surfaceAt(a.i, a.j);
 
-  G.torches = def.torches.map((a) => { const t = new Torch(top(a)); root.add(t.group); return t; });
+  G.torches = def.torches.map((a) => { const t = new Torch(top(a), def); root.add(t.group); return t; });
   G.checkpoints = def.checkpoints.map((a) => { const c = new Checkpoint(top(a), a.i, a.j); root.add(c.mesh); return c; });
   G.boxes = def.boxes.map((a) => { const b = new LamentBox(top(a)); root.add(b.group); return b; });
   G.hooks = def.hooks.map((a, k) => { const h = new Hook(top(a), a.axis, k * 1.9 + a.i * 0.3); root.add(h.group); return h; });
@@ -92,6 +97,13 @@ function loadLevel(idx) {
   });
   G.chains = def.chains.map((a) => { const c = new HangingChain(new THREE.Vector3((a.i + 0.5) * T, a.h, (a.j + 0.5) * T)); root.add(c.group); return c; });
   def.skulls.forEach((a) => root.add(skullPile(top(a))));
+  G.coins = def.coins.map((a) => { const c = new Coin(top(a)); root.add(c.mesh); return c; });
+  G.winds = def.cells.filter((c) => c && c.wind).map((c) => {
+    const w = new WindTile(world.surfaceAt(c.i, c.j), c.wind); root.add(w.mesh); return w;
+  });
+  G.winds.push(...def.cells.filter((c) => c && c.kind === 'slick').map((c) => {
+    const g = new GreaseTile(world.surfaceAt(c.i, c.j)); root.add(g.mesh); return g;
+  }));
   G.orbs = def.orbs.map((a) => {
     const body = new Body(ORB_R); body.accel = 11; body.maxSpeed = 10; body.friction = 0.7;
     const mesh = new OrbMesh(ORB_R); root.add(mesh.group);
@@ -105,7 +117,8 @@ function loadLevel(idx) {
   G.spawn = top(def.start);
   G.time += def.time;
   respawn(true);
-  $('hud-level').textContent = idx + 1;
+  $('hud-circle').textContent = `CIRCLE ${def.numeral}`;
+  $('hud-level').textContent = def.sin.toUpperCase();
 }
 
 function respawn(fresh) {
@@ -138,14 +151,14 @@ function hideCard() { screen.classList.add('hidden'); }
 function titleCard() {
   G.state = 'title';
   hud.classList.add('hidden');
-  const btns = LEVELS.map((_, i) => `<button data-lv="${i}">${i + 1}</button>`).join('');
+  const btns = SINS.map((s, i) => `<button data-lv="${i}" title="${s.sin}" style="--c:${s.accent}"><b>${s.numeral}</b><span>${s.sin}</span></button>`).join('');
   showCard(`
     <h1>LABYRINTH<br><span>LARRY</span></h1>
-    <p class="tag">Larry died. Hell put him in a cage. Roll him down through the labyrinth and out the hellmouth before the sands run out.</p>
+    <p class="tag">Larry died. Hell put him in a cage. Roll him down through the seven circles of sin and out each hellmouth before the sands run out.</p>
     <ul>
       <li><b>Drag anywhere</b> to roll the cage that way. Let go to coast.</li>
       <li>Ramps speed you up. <b>Falls taller than a man</b> break Larry.</li>
-      <li>Dodge soul orbs, hooks, spikes, flames and lava. Bone bridges crumble.</li>
+      <li>Every sin has its own torment: envious orbs, wrathful hooks, sloth's tar, greed's gold, gluttony's grease, lust's winds.</li>
       <li>Grab <b>Lament boxes</b> for +${BOX_TIME}s. Rune circles are checkpoints.</li>
       <li>Desktop: WASD or arrows. P pauses. M mutes.</li>
     </ul>
@@ -165,8 +178,20 @@ function startGame(idx) {
 function levelIntro() {
   G.state = 'intro'; G.stateT = 0;
   hideCard(); hud.classList.remove('hidden');
-  showToast(`CIRCLE ${G.levelIdx + 1}<br>${G.level.name.toUpperCase()}<small>${G.level.sub}</small>`, 2.2);
+  showSinTitle(G.level);
 }
+
+// The big Sin title card that opens every circle.
+let sinTimer = 0;
+function showSinTitle(def) {
+  const el = $('sin-intro');
+  el.style.setProperty('--accent', def.accent);
+  el.innerHTML = `<div class="circle">CIRCLE ${def.numeral}</div><div class="sin">${def.sin.toUpperCase()}</div>
+    <div class="title">${def.title}</div><div class="quote">${def.quote}</div>`;
+  el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+  sinTimer = 3.2;
+}
+function hideSinTitle() { $('sin-intro').classList.remove('show'); sinTimer = 0; }
 
 function levelDone() {
   G.state = 'done';
@@ -176,11 +201,11 @@ function levelDone() {
   const last = G.levelIdx === LEVELS.length - 1;
   showCard(last ? `
     <h1>FREE<br><span>AT LAST</span></h1>
-    <p class="tag">Larry tumbles out of the final hellmouth into... another cage? Hell has a sense of humour.</p>
+    <p class="tag">Seven sins rolled through. Larry tumbles out of the last hellmouth into... another cage? Hell has a sense of humour.</p>
     <div class="stats"><span>Escape bonus</span><b>${lvBonus}</b><span>Time bonus</span><b>${timeBonus}</b><span>Final score</span><b>${G.score}</b></div>
     <button class="btn" id="go">AGAIN</button>` : `
-    <h2>CIRCLE ${G.levelIdx + 1} ESCAPED</h2>
-    <p class="tag">Down, ever down.</p>
+    <h2 style="color:${G.level.accent}">${G.level.sin.toUpperCase()} OVERCOME</h2>
+    <p class="tag">Circle ${G.level.numeral} escaped. Down, ever down, to ${SINS[G.levelIdx + 1].sin.toLowerCase()}.</p>
     <div class="stats"><span>Circle bonus</span><b>${lvBonus}</b><span>Time bonus (${Math.ceil(G.time)}s)</span><b>${timeBonus}</b><span>Score</span><b>${G.score}</b></div>
     <p class="tag">Remaining time carries into the next circle.</p>
     <button class="btn" id="go">DEEPER</button>`);
@@ -195,7 +220,7 @@ function gameOver() {
   showCard(`
     <h1>TIME'S<br><span>UP</span></h1>
     <p class="tag">The labyrinth keeps Larry for another eternity.</p>
-    <div class="stats"><span>Reached</span><b>Circle ${G.levelIdx + 1}</b><span>Score</span><b>${G.score}</b></div>
+    <div class="stats"><span>Undone by</span><b>${G.level.sin}</b><span>Score</span><b>${G.score}</b></div>
     <button class="btn" id="go">RETRY CIRCLE</button><br>
     <button class="btn ghost" id="menu">MENU</button>`);
   $('go').onclick = () => { G.score = Math.floor(G.score / 2); G.time = 0; loadLevel(G.levelIdx); levelIntro(); };
@@ -316,6 +341,11 @@ function stepPlay(dt) {
       b.taken = true; G.time += BOX_TIME; G.score += 500; sfx.pickup(); showToast(`+${BOX_TIME}s<small>Lament box: +500</small>`, 1.2);
     }
   }
+  for (const c of G.coins) {
+    if (!c.taken && Math.hypot(c.pos.x - player.x, c.pos.z - player.z) < 1.1 && Math.abs(c.pos.y - player.y) < 1.5) {
+      c.taken = true; G.score += 100; sfx.coin();
+    }
+  }
   // soul orbs roll after Larry when he is near and on their level
   for (const o of G.orbs) {
     if (o.dead) { o.dead -= dt; if (o.dead <= 0) resetOrb(o); continue; }
@@ -341,12 +371,13 @@ function update(dt) {
   G.t += dt;
   const t = G.t;
   if (toastTimer > 0) { toastTimer -= dt; if (toastTimer <= 0) toast.classList.remove('show'); }
+  if (sinTimer > 0 && G.state !== 'paused') { sinTimer -= dt; if (sinTimer <= 0 || G.state !== 'intro' && G.state !== 'play') hideSinTitle(); }
   if (!G.world) return;
   if (G.state === 'paused') return;
 
   if (G.state === 'intro') {
     G.stateT += dt;
-    if (G.stateT > 1.2 || input.read()) G.state = 'play';
+    if (G.stateT > 2.4 || (G.stateT > 0.6 && input.read())) G.state = 'play';
   } else if (G.state === 'play') {
     stepPlay(dt);
   } else if (G.state === 'dying') {
@@ -370,6 +401,8 @@ function update(dt) {
   for (const c of G.checkpoints) c.update(t, dt);
   for (const b of G.boxes) b.update(t);
   for (const c of G.chains) c.update(t);
+  for (const c of G.coins) c.update(t);
+  for (const w of G.winds) w.update(t);
   for (const tc of G.torches) tc.update(t);
   G.mouth.update(t, dt); G.embers.update(dt);
 
