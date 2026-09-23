@@ -34,6 +34,35 @@ Then open `http://localhost:8080`.
   palettes (Sin City only).
 - **⚙ Settings** (title screen, or the cog in play): art style, ink palette, sound.
 
+## Menus: tarot cards, scrolls and banners
+
+Every menu is a tarot trump, drawn in CSS and inline SVG. Each card has a gold
+double border, corner ornaments, a Roman numeral, a line-art plate, and a
+parchment nameplate:
+
+| Screen | Card |
+|---|---|
+| Title | **0 · The Fool**: Larry in his gyro-cage |
+| Settings | **I · The Magician** |
+| Pause | **XII · The Hanged Man** |
+| Time's up | **XIII · Death** |
+| Circle complete | that sin's own card (**I–VII**) with its sigil |
+| Final escape | **XXI · The World** |
+
+- Headings and the primary button are swallowtail **banners**.
+- Stats and the rules are written on **parchment scrolls** with rolled ends.
+- Level select is a fanned hand of seven mini trumps.
+- In play, score and circle hang as banners, the sands as a parchment pennant,
+  and the corner buttons are **wax seals**.
+- The type is Cinzel and IM Fell English, with serif fallbacks offline.
+
+It's all driven by CSS tokens, so the Sin City art style turns the same
+cards into ink, paper and one accent colour.
+
+| | | |
+|---|---|---|
+| ![Title: The Fool](docs/screenshots/tarot-title.png) | ![Circle complete: Sloth](docs/screenshots/tarot-sloth.png) | ![Title in Sin City ink](docs/screenshots/tarot-title-ink.png) |
+
 ## Art styles
 
 The ⚙ settings card switches between two looks. Your choice is saved, and a
@@ -103,6 +132,7 @@ textures). There are no image or audio files.
 | `js/sins.js` | The seven sins: names, title cards and each circle's palette |
 | `js/ink.js` | Sin City art style: ink palettes, material role patch, hatching/edge post pass |
 | `js/settings.js` | Saved settings (art style, palette, sound) with URL overrides |
+| `js/ui.js` | Tarot and scroll UI: SVG card art and sin sigils, `tarot()`, `ribbon()`, `scroll()`, `deck()` |
 | `js/world.js` | Height grid (every cell is a plane), merged tile/wall meshes, lava shader |
 | `js/physics.js` | Rolling ball on the grid: slopes, walls, falls, ball-to-ball bounces |
 | `js/larry.js` | The cage, Larry, his loincloth, run cycle and scream bubble |
