@@ -9,6 +9,7 @@ import { Sfx } from './audio.js';
 import { glowTexture } from './textures.js';
 import { InkPass, inkify, inkUniform, INK_PALETTES, inkPalette, applyInkVisibility, inkHide } from './ink.js';
 import { loadSettings, saveSettings, cyclePalette } from './settings.js';
+import { ART, SIGIL, tarot, ribbon, scroll, deck } from './ui.js';
 import { Torch, Hellmouth, Checkpoint, LamentBox, OrbMesh, Hook, Trap, BoneSlab, skullPile, HangingChain, Embers, Coin, WindTile, GreaseTile } from './props.js';
 
 const PLAYER_R = 0.8, ORB_R = 0.6;
@@ -157,29 +158,42 @@ let toastTimer = 0;
 function showToast(html, dur = 1.4, cls = '') {
   toast.innerHTML = html; toast.className = 'toast show ' + cls; toastTimer = dur;
 }
-function showCard(html) { card.innerHTML = html; screen.classList.remove('hidden'); }
-function hideCard() { screen.classList.add('hidden'); }
+// Every menu is a tarot card; `wide` gives the settings card a little more room.
+function showCard(html, cls = '') { card.innerHTML = html; card.className = 'card ' + cls; screen.classList.remove('hidden'); card.scrollTop = 0; syncCorner(); }
+function hideCard() { screen.classList.add('hidden'); syncCorner(); }
 
 function titleCard() {
   G.state = 'title';
   hud.classList.add('hidden');
-  const btns = SINS.map((s, i) => `<button data-lv="${i}" title="${s.sin}" style="--c:${s.accent}"><b>${s.numeral}</b><span>${s.sin}</span></button>`).join('');
-  showCard(`
-    <h1>LABYRINTH<br><span>LARRY</span></h1>
-    <p class="tag">Larry died. Hell put him in a cage. Roll him down through the seven circles of sin and out each hellmouth before the sands run out.</p>
+  showCard(tarot({
+    numeral: '0', name: 'The Fool', art: ART.fool,
+    body: `${ribbon('Labyrinth <b>Larry</b>', 'title')}
+      <p class="tag">Larry died. Hell caged him. Roll him down the seven circles of sin before the sands run out.</p>
+      <button class="btn" id="go">Descend</button>
+      <div class="row"><button class="btn ghost" id="rules">📜 Rules</button><button class="btn ghost" id="settings">⚙ Settings</button></div>
+      <div class="deck-lbl">Choose your circle</div>
+      ${deck(SINS)}`,
+  }), 'title-card');
+  $('go').onclick = () => startGame(0);
+  $('rules').onclick = rulesCard;
+  $('settings').onclick = openSettings;
+  card.querySelectorAll('[data-lv]').forEach((b) => { b.onclick = () => startGame(+b.dataset.lv); });
+}
+
+// How to play, written on an unfurled scroll.
+function rulesCard() {
+  showCard(scroll(`
+    <h3>The Rules of the Descent</h3>
     <ul>
       <li><b>Drag anywhere</b> to roll the cage that way. Let go to coast.</li>
       <li>Ramps speed you up. <b>Falls taller than a man</b> break Larry.</li>
-      <li>Every sin has its own torment: envious orbs, wrathful hooks, sloth's tar, greed's gold, gluttony's grease, lust's winds.</li>
+      <li>Each sin has its own torment: envious orbs, wrathful hooks, sloth's tar, greed's gold, gluttony's grease and lust's winds.</li>
       <li>Grab <b>Lament boxes</b> for +${BOX_TIME}s. Rune circles are checkpoints.</li>
-      <li>Desktop: WASD or arrows. P pauses. M mutes.</li>
+      <li>Leftover time carries into the next circle.</li>
+      <li>Desktop: WASD or arrows. P pauses, M mutes, C cycles ink palettes.</li>
     </ul>
-    <button class="btn" id="go">DESCEND</button>
-    <button class="btn ghost" id="settings">⚙ SETTINGS</button>
-    <div class="levels">${btns}</div>`);
-  $('go').onclick = () => startGame(0);
-  $('settings').onclick = openSettings;
-  card.querySelectorAll('[data-lv]').forEach((b) => { b.onclick = () => startGame(+b.dataset.lv); });
+    <button class="btn" id="go">Back</button>`, 'rules'), 'scroll-card');
+  $('go').onclick = titleCard;
 }
 
 function startGame(idx) {
@@ -200,8 +214,8 @@ let sinTimer = 0;
 function showSinTitle(def) {
   const el = $('sin-intro');
   el.style.setProperty('--accent', def.accent);
-  el.innerHTML = `<div class="circle">CIRCLE ${def.numeral}</div><div class="sin">${def.sin.toUpperCase()}</div>
-    <div class="title">${def.title}</div><div class="quote">${def.quote}</div>`;
+  el.innerHTML = `<div class="circle"><span>Circle ${def.numeral}</span></div><div class="sin">${def.sin}</div>
+    <div class="title"><span>${def.title}</span></div><div class="quote">${def.quote}</div>`;
   el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
   sinTimer = 3.2;
 }
@@ -213,16 +227,21 @@ function levelDone() {
   G.score += timeBonus + lvBonus;
   updateHud();
   const last = G.levelIdx === LEVELS.length - 1;
-  showCard(last ? `
-    <h1>FREE<br><span>AT LAST</span></h1>
-    <p class="tag">Seven sins rolled through. Larry tumbles out of the last hellmouth into... another cage? Hell has a sense of humour.</p>
-    <div class="stats"><span>Escape bonus</span><b>${lvBonus}</b><span>Time bonus</span><b>${timeBonus}</b><span>Final score</span><b>${G.score}</b></div>
-    <button class="btn" id="go">AGAIN</button>` : `
-    <h2 style="color:${G.level.accent}">${G.level.sin.toUpperCase()} OVERCOME</h2>
-    <p class="tag">Circle ${G.level.numeral} escaped. Down, ever down, to ${SINS[G.levelIdx + 1].sin.toLowerCase()}.</p>
-    <div class="stats"><span>Circle bonus</span><b>${lvBonus}</b><span>Time bonus (${Math.ceil(G.time)}s)</span><b>${timeBonus}</b><span>Score</span><b>${G.score}</b></div>
-    <p class="tag">Remaining time carries into the next circle.</p>
-    <button class="btn" id="go">DEEPER</button>`);
+  const lv = G.level;
+  showCard(last ? tarot({
+    numeral: 'XXI', name: 'The World', art: ART.world,
+    body: `${ribbon('Free at Last')}
+      <p class="tag">Seven sins rolled through. Larry tumbles out of the last hellmouth into... another cage?</p>
+      ${scroll(`<dl class="stats"><dt>Escape bonus</dt><dd>${lvBonus}</dd><dt>Time bonus</dt><dd>${timeBonus}</dd><dt>Final score</dt><dd>${G.score}</dd></dl>`)}
+      <button class="btn" id="go">Again</button>`,
+  }) : tarot({
+    numeral: lv.numeral, name: lv.sin, art: SIGIL[lv.sin], accent: lv.accent,
+    body: `${ribbon(`${lv.sin} Overcome`, 'sin')}
+      <p class="tag">Circle ${lv.numeral} escaped. Down, ever down, to ${SINS[G.levelIdx + 1].sin.toLowerCase()}.</p>
+      ${scroll(`<dl class="stats"><dt>Circle bonus</dt><dd>${lvBonus}</dd><dt>Time bonus (${Math.ceil(G.time)}s)</dt><dd>${timeBonus}</dd><dt>Score</dt><dd>${G.score}</dd></dl>
+        <p class="fine">Remaining time carries into the next circle.</p>`)}
+      <button class="btn" id="go">Deeper</button>`,
+  }));
   $('go').onclick = () => {
     if (last) { titleCard(); return; }
     loadLevel(G.levelIdx + 1); levelIntro();
@@ -231,12 +250,14 @@ function levelDone() {
 
 function gameOver() {
   G.state = 'over';
-  showCard(`
-    <h1>TIME'S<br><span>UP</span></h1>
-    <p class="tag">The labyrinth keeps Larry for another eternity.</p>
-    <div class="stats"><span>Undone by</span><b>${G.level.sin}</b><span>Score</span><b>${G.score}</b></div>
-    <button class="btn" id="go">RETRY CIRCLE</button><br>
-    <button class="btn ghost" id="menu">MENU</button>`);
+  showCard(tarot({
+    numeral: 'XIII', name: 'Death', art: ART.death,
+    body: `${ribbon("Time's Up", 'death')}
+      <p class="tag">The labyrinth keeps Larry for another eternity.</p>
+      ${scroll(`<dl class="stats"><dt>Undone by</dt><dd>${G.level.sin}</dd><dt>Score</dt><dd>${G.score}</dd></dl>`)}
+      <button class="btn" id="go">Retry Circle</button>
+      <div class="row"><button class="btn ghost" id="menu">Menu</button></div>`,
+  }));
   $('go').onclick = () => { G.score = Math.floor(G.score / 2); G.time = 0; loadLevel(G.levelIdx); levelIntro(); };
   $('menu').onclick = titleCard;
 }
@@ -251,8 +272,13 @@ function setPaused(p) {
   }
 }
 function pauseCard() {
-  showCard(`<h2>PAUSED</h2><p class="tag">Larry screams quietly.</p><button class="btn" id="go">RESUME</button><br>
-    <button class="btn ghost" id="settings">⚙ SETTINGS</button> <button class="btn ghost" id="menu">MENU</button>`);
+  showCard(tarot({
+    numeral: 'XII', name: 'The Hanged Man', art: ART.hanged,
+    body: `${ribbon('Paused')}
+      <p class="tag">Suspended between circles. Larry screams quietly.</p>
+      <button class="btn" id="go">Resume</button>
+      <div class="row"><button class="btn ghost" id="settings">⚙ Settings</button><button class="btn ghost" id="menu">Menu</button></div>`,
+  }));
   $('go').onclick = () => setPaused(false);
   $('settings').onclick = () => settingsCard(pauseCard);
   $('menu').onclick = titleCard;
@@ -285,8 +311,9 @@ function settingsCard(back) {
     return `<button class="swatch${p.id === settings.palette ? ' on' : ''}" data-pal="${p.id}" title="${p.name}">
       <i style="background:${p.ink}"></i><i style="background:${p.paper}"></i><i style="background:${acc}"></i><span>${p.name}</span></button>`;
   }).join('');
-  showCard(`
-    <h2>SETTINGS</h2>
+  showCard(tarot({
+    numeral: 'I', name: 'The Magician', art: ART.magician,
+    body: `${ribbon('Settings')}
     <div class="set-row"><span class="set-lbl">ART STYLE</span>
       <div class="segs">${seg('art-classic', settings.art === 'classic', 'HELLFIRE')}${seg('art-ink', settings.art === 'ink', 'SIN CITY')}</div></div>
     <p class="set-note">${settings.art === 'ink'
@@ -296,15 +323,16 @@ function settingsCard(back) {
       <div class="swatches">${pals}</div></div>
     <div class="set-row"><span class="set-lbl">SOUND</span>
       <div class="segs">${seg('snd-on', !sfx.muted, 'ON')}${seg('snd-off', sfx.muted, 'OFF')}</div></div>
-    <button class="btn" id="done">DONE</button>`);
+    <button class="btn" id="done">Done</button>`,
+  }), 'settings-card');
   const set = (patch) => { Object.assign(settings, patch); saveSettings(settings); applyArt(); settingsCard(back); };
   $('art-classic').onclick = () => set({ art: 'classic' });
   $('art-ink').onclick = () => set({ art: 'ink' });
   $('snd-on').onclick = () => { sfx.setMuted(false); set({ muted: false }); };
   $('snd-off').onclick = () => { sfx.setMuted(true); set({ muted: true }); };
   card.querySelectorAll('[data-pal]').forEach((b) => { b.onclick = () => set({ palette: b.dataset.pal, art: 'ink' }); });
-  $('done').onclick = () => { G.settingsOpen = false; back(); };
-  G.settingsOpen = true;
+  $('done').onclick = () => { G.settingsOpen = false; back(); syncCorner(); };
+  G.settingsOpen = true; syncCorner();
   $('done').id = 'go'; // Enter/Space closes it like every other card
 }
 
@@ -530,11 +558,13 @@ function update(dt) {
 }
 
 // corner buttons: cog alone on menus, the full column in play, hidden under the settings card
-const corner = $('corner');
 function syncCorner() {
+  const corner = $('corner');
   corner.classList.toggle('in-play', !['title', 'done', 'over'].includes(G.state));
   // hidden under the settings card, and on the level-done / game-over cards (their buttons must stay)
-  corner.classList.toggle('hidden', !!G.settingsOpen || G.state === 'done' || G.state === 'over');
+  // (and under any card during play: the pause card carries its own Resume / Settings)
+  const cardUp = !screen.classList.contains('hidden') && G.state !== 'title';
+  corner.classList.toggle('hidden', !!G.settingsOpen || cardUp || G.state === 'done' || G.state === 'over');
 }
 
 function drawOverlay() {
@@ -564,4 +594,4 @@ titleCard();
 requestAnimationFrame(frame);
 
 // test hook for automated checks
-window.__game = { G, player, loadLevel, startGame, die, camera, larry, settings, applyArt };
+window.__game = { G, player, loadLevel, startGame, die, camera, larry, settings, applyArt, levelDone, gameOver, setPaused };
