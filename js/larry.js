@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { markAccent, markRole } from './ink.js';
 
 // Larry: a damned soul in a loincloth and red beanie, strapped upright inside a
 // riveted iron sphere cage (a human gyroscope). The cage rolls freely; Larry
@@ -12,6 +13,7 @@ export class Larry {
     this.root.add(this.cage, this.man);
     this._buildCage();
     this._buildMan();
+    markRole(this.cage, 'paper'); markRole(this.man, 'paper'); // beanie stays accent (marked first)
     this.heading = 0; this.runPhase = 0; this.squash = 1;
   }
 
@@ -50,7 +52,7 @@ export class Larry {
   _buildMan() {
     const r = this.r, m = this.man;
     const mat = (c) => new THREE.MeshLambertMaterial({ color: c });
-    const skin = mat(0xd9956c), skinDark = mat(0xb87552), hat = mat(0xd21c2c);
+    const skin = mat(0xd9956c), skinDark = mat(0xb87552), hat = markAccent(mat(0xd21c2c)); // the red beanie is Larry's one splash of colour in ink mode
     const cloth = mat(0x7a5a3a), rope = mat(0x3b2616);
     const s = r / 0.8; // model authored for r = 0.8
     const box = (w, h, d, material) => new THREE.Mesh(new THREE.BoxGeometry(w * s, h * s, d * s), material);
@@ -86,11 +88,11 @@ export class Larry {
     beanie.position.y = 0.47 * s; m.add(beanie);
     const cuff = new THREE.Mesh(new THREE.CylinderGeometry(0.145 * s, 0.145 * s, 0.05 * s, 12), hat);
     cuff.position.y = 0.48 * s; m.add(cuff);
-    const dark = mat(0x111111);
+    const dark = markRole(mat(0x111111), 'mono'); // eyes and mouth stay ink on the white figure
     for (const side of [-1, 1]) {
       const e = box(0.03, 0.03, 0.02, dark); e.position.set(side * 0.05 * s, 0.46 * s, 0.12 * s); m.add(e);
     }
-    this.mouth = box(0.07, 0.07, 0.02, mat(0x2a0505));
+    this.mouth = box(0.07, 0.07, 0.02, markRole(mat(0x2a0505), 'mono'));
     this.mouth.position.set(0, 0.39 * s, 0.125 * s); m.add(this.mouth);
     // bare arms stretched out to grip the equator, like the photo
     this.arms = [];

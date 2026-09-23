@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { flagstoneTexture, brickTexture } from './textures.js';
+import { inkUniform, INK_GLSL } from './ink.js';
 
 // The labyrinth is a grid of square cells. Every solid cell carries a plane,
 // h(x, z) = c + sx*x + sz*z (world units), so flat floors and ramps share one
@@ -160,7 +161,7 @@ export function makeLavaMaterial(scale, bright = 1, theme = null) {
   const hot = theme ? theme.lavaHot : [1.0, 0.85, 0.3], mid = theme ? theme.lavaMid : [1.0, 0.35, 0.03];
   return new THREE.ShaderMaterial({
     uniforms: { uTime: { value: 0 }, uScale: { value: scale }, uBright: { value: bright },
-      uHot: { value: new THREE.Vector3(...hot) }, uMid: { value: new THREE.Vector3(...mid) } },
+      uHot: { value: new THREE.Vector3(...hot) }, uMid: { value: new THREE.Vector3(...mid) }, uInk: inkUniform },
     vertexShader: `
       varying vec2 vW;
       void main() {
@@ -169,7 +170,8 @@ export function makeLavaMaterial(scale, bright = 1, theme = null) {
         gl_Position = projectionMatrix * viewMatrix * w;
       }`,
     fragmentShader: `
-      uniform float uTime; uniform float uScale; uniform float uBright; uniform vec3 uHot; uniform vec3 uMid;
+      uniform float uTime; uniform float uScale; uniform float uBright; uniform vec3 uHot; uniform vec3 uMid; uniform float uInk;
+      ${INK_GLSL}
       varying vec2 vW;
       float h(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
       float n(vec2 p) {
@@ -185,7 +187,8 @@ export function makeLavaMaterial(scale, bright = 1, theme = null) {
         vec3 hot = mix(uHot, uMid, smoothstep(0.1, 0.45, f));
         vec3 col = mix(hot, uMid * 0.14 + vec3(0.03), crust);
         col *= 0.85 + 0.25 * sin(uTime * 1.7 + f * 9.0);
-        gl_FragColor = vec4(col * uBright, 1.0);
+        // ink mode keeps the sea mostly hatched: the one colour stays a detail, not a flood
+        gl_FragColor = vec4(inkAccent(col * uBright * (uInk > 0.5 && uBright < 0.99 ? 0.55 : 1.0)), 1.0);
         #include <colorspace_fragment>
       }`,
   });

@@ -109,3 +109,55 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   80% { opacity: 1; }
   100% { opacity: 0; transform: translateY(-20px); }
 }
+
+/* ---------------------------------------------------------------- settings */
+.set-row { margin: 12px 0 4px; text-align: left; }
+.set-row.dim { opacity: 0.45; }
+.set-lbl { display: block; font: 800 11px system-ui, sans-serif; letter-spacing: 2px; color: var(--ember); margin-bottom: 6px; }
+.set-lbl small { font-weight: 600; letter-spacing: 0; opacity: 0.7; }
+.set-note { margin: 4px 0 8px; font-size: 13px; color: #e9c9a0; text-align: left; font-style: italic; }
+.segs { display: flex; gap: 6px; }
+.seg {
+  flex: 1; padding: 10px 6px; border-radius: 6px; border: 2px solid #6a1c10; background: #2a0a06; color: var(--bone);
+  font: 900 15px Impact, "Arial Black", sans-serif; letter-spacing: 2px; cursor: pointer;
+}
+.seg.on { background: linear-gradient(#d0301a, #7a0c06); color: #fff4e0; border-color: #ff6a1f; }
+.swatches { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+.swatch {
+  display: flex; align-items: center; gap: 3px; padding: 6px; border-radius: 6px; cursor: pointer;
+  border: 2px solid #6a1c10; background: #1a0604; color: var(--bone); font: 700 12px system-ui, sans-serif; text-align: left;
+}
+.swatch i { width: 14px; height: 14px; border: 1px solid #777; flex: none; }
+.swatch span { margin-left: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.swatch.on { border-color: #ffd27a; }
+#settings { margin-top: 12px; }
+
+/* ---------------------------------------------------------------- ink (Sin City) chrome
+   Three roles only: --ink-c (dark), --paper-c (light), --acc-c (the one colour).
+   No gradients, no glows; hard offsets and rules, like print. */
+body.ink { background: var(--ink-c); color: var(--paper-c); }
+body.ink .screen { background: color-mix(in srgb, var(--ink-c) 72%, transparent); }
+body.ink .card, body.ink .score, body.ink .level, body.ink .mini {
+  background: var(--ink-c); border: 2px solid var(--paper-c); box-shadow: 5px 5px 0 var(--acc-c); color: var(--paper-c);
+}
+body.ink .card { border-radius: 0; }
+body.ink .score, body.ink .level, body.ink .mini { box-shadow: 3px 3px 0 var(--acc-c); }
+body.ink .lbl, body.ink .set-lbl { color: var(--acc-c); }
+body.ink .card h1, body.ink .card h2, body.ink .time, body.ink .toast, body.ink .sin-intro .title {
+  color: var(--paper-c); text-shadow: 4px 4px 0 var(--acc-c);
+}
+body.ink .card h1 span { color: var(--acc-c); text-shadow: 4px 4px 0 var(--paper-c); }
+body.ink .card h2[style] { color: var(--acc-c) !important; text-shadow: 3px 3px 0 var(--paper-c); }
+body.ink .tag, body.ink .card ul, body.ink .set-note, body.ink .sin-intro .quote, body.ink .toast small { color: var(--paper-c); text-shadow: none; }
+body.ink .card .stats b { color: var(--acc-c); }
+body.ink .time.low { color: var(--acc-c); text-shadow: 4px 4px 0 var(--paper-c); }
+body.ink .toast.death { color: var(--acc-c); text-shadow: 4px 4px 0 var(--paper-c); }
+body.ink .btn { background: var(--paper-c); color: var(--ink-c); box-shadow: 5px 5px 0 var(--acc-c); border-radius: 0; }
+body.ink .btn.ghost { background: var(--ink-c); color: var(--paper-c); border: 2px solid var(--paper-c); box-shadow: 3px 3px 0 var(--acc-c); }
+body.ink .seg, body.ink .swatch, body.ink .levels button { background: var(--ink-c); color: var(--paper-c); border: 2px solid var(--paper-c); border-radius: 0; }
+body.ink .seg.on { background: var(--paper-c); color: var(--ink-c); border-color: var(--paper-c); box-shadow: 3px 3px 0 var(--acc-c); }
+body.ink .swatch.on { border-color: var(--acc-c); box-shadow: 3px 3px 0 var(--acc-c); }
+body.ink .levels button b { color: var(--paper-c); }
+body.ink .sin-intro { --accent: var(--acc-c) !important; }
+body.ink .sin-intro .sin { color: var(--accent); text-shadow: 6px 6px 0 var(--paper-c); }
+body.ink .sin-intro .circle { color: var(--paper-c); text-shadow: none; }
