@@ -20,17 +20,20 @@
       <div id="hud-time" class="time">60</div>
       <div class="level"><span class="lbl" id="hud-circle">CIRCLE I</span><span id="hud-level">PRIDE</span></div>
     </div>
-    <div class="corner-btns">
-      <button id="pause-btn" class="mini" aria-label="Pause">II</button>
-      <button id="settings-btn" class="mini" aria-label="Settings" title="Settings">⚙</button>
-      <button id="mute-btn" class="mini" aria-label="Mute sound">♪</button>
-    </div>
     <div id="toast" class="toast"></div>
     <div id="sin-intro" class="sin-intro"></div>
   </div>
 
   <div id="screen" class="screen">
     <div class="card" id="card"></div>
+  </div>
+
+  <!-- Outside #hud and after #screen, so the cog is on top and tappable on
+       every screen (title, play, pause). Pause and mute only show in play. -->
+  <div id="corner" class="corner-btns">
+    <button id="pause-btn" class="mini play-only" aria-label="Pause">II</button>
+    <button id="settings-btn" class="mini" aria-label="Settings" title="Settings">⚙</button>
+    <button id="mute-btn" class="mini play-only" aria-label="Mute sound">♪</button>
   </div>
 
   <script type="module" src="js/main.js"></script>

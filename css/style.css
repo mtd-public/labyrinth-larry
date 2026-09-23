@@ -35,9 +35,12 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 @keyframes pulse { to { transform: scale(1.12); } }
 
 .corner-btns {
-  position: absolute; right: 12px; top: calc(max(10px, env(safe-area-inset-top)) + 64px);
-  display: flex; flex-direction: column; gap: 8px; pointer-events: auto;
+  position: fixed; z-index: 5; right: 12px; top: max(10px, env(safe-area-inset-top));
+  display: flex; flex-direction: column; gap: 8px; pointer-events: none;
 }
+.corner-btns.in-play { top: calc(max(10px, env(safe-area-inset-top)) + 64px); }
+.corner-btns:not(.in-play) .play-only { display: none; }
+.corner-btns .mini { pointer-events: auto; touch-action: none; } /* own touch-action: it isn't inherited */
 .mini {
   width: 42px; height: 42px; border-radius: 50%; border: 2px solid #5a1a10; background: var(--panel);
   color: var(--bone); font-weight: 900; font-size: 16px; cursor: pointer;
@@ -78,6 +81,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   font: 900 22px Impact, "Arial Black", sans-serif; letter-spacing: 2px; color: #fff4e0;
   background: linear-gradient(#d0301a, #7a0c06); box-shadow: 0 4px 0 #3a0804, 0 0 20px rgba(255, 60, 0, 0.45);
 }
+.btn, .seg, .swatch, .levels button { touch-action: manipulation; }
 .btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #3a0804; }
 .btn.ghost { background: transparent; border: 2px solid #6a1c10; box-shadow: none; font-size: 16px; padding: 10px 22px; margin-top: 10px; }
 .levels { display: flex; gap: 6px; justify-content: center; margin-top: 12px; flex-wrap: wrap; }
