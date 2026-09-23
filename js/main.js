@@ -175,10 +175,10 @@ function titleCard() {
       <li>Desktop: WASD or arrows. P pauses. M mutes.</li>
     </ul>
     <button class="btn" id="go">DESCEND</button>
-    <div class="levels">${btns}</div>
-    <button class="btn ghost" id="settings">⚙ SETTINGS</button>`);
+    <button class="btn ghost" id="settings">⚙ SETTINGS</button>
+    <div class="levels">${btns}</div>`);
   $('go').onclick = () => startGame(0);
-  $('settings').onclick = () => settingsCard(titleCard);
+  $('settings').onclick = openSettings;
   card.querySelectorAll('[data-lv]').forEach((b) => { b.onclick = () => startGame(+b.dataset.lv); });
 }
 
@@ -303,16 +303,29 @@ function settingsCard(back) {
   $('snd-on').onclick = () => { sfx.setMuted(false); set({ muted: false }); };
   $('snd-off').onclick = () => { sfx.setMuted(true); set({ muted: true }); };
   card.querySelectorAll('[data-pal]').forEach((b) => { b.onclick = () => set({ palette: b.dataset.pal, art: 'ink' }); });
-  $('done').onclick = back;
+  $('done').onclick = () => { G.settingsOpen = false; back(); };
+  G.settingsOpen = true;
   $('done').id = 'go'; // Enter/Space closes it like every other card
 }
 
-$('settings-btn').onclick = () => { setPaused(true); if (G.state === 'paused') settingsCard(pauseCard); };
-$('pause-btn').onclick = () => setPaused(G.state !== 'paused');
-$('mute-btn').onclick = () => { sfx.setMuted(!sfx.muted); settings.muted = sfx.muted; saveSettings(settings); applyArt(); };
+// Corner buttons act on pointerdown (a synthesized click is unreliable on touch
+// next to a game surface) and stop propagation; keyboard activation still works.
+function tapButton(el, fn) {
+  el.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); fn(); });
+  el.addEventListener('click', (e) => { if (e.detail === 0) fn(); });
+}
+function openSettings() {
+  if (G.settingsOpen) return;
+  if (G.state === 'title') { settingsCard(titleCard); return; }
+  setPaused(true);
+  if (G.state === 'paused') settingsCard(pauseCard);
+}
+tapButton($('settings-btn'), openSettings);
+tapButton($('pause-btn'), () => setPaused(G.state !== 'paused'));
+tapButton($('mute-btn'), () => { sfx.setMuted(!sfx.muted); settings.muted = sfx.muted; saveSettings(settings); applyArt(); });
 input.onKey = (k) => {
   if (k === 'p' || k === 'escape') setPaused(G.state !== 'paused');
-  if (k === 'm') $('mute-btn').click();
+  if (k === 'm') { sfx.setMuted(!sfx.muted); settings.muted = sfx.muted; saveSettings(settings); applyArt(); }
   if (k === 'c' && settings.art === 'ink') {
     cyclePalette(settings, input._keys.has('shift') ? -1 : 1); saveSettings(settings); applyArt();
     showToast(inkPalette(settings.palette).name.toUpperCase(), 0.9);
@@ -516,6 +529,14 @@ function update(dt) {
   updateHud();
 }
 
+// corner buttons: cog alone on menus, the full column in play, hidden under the settings card
+const corner = $('corner');
+function syncCorner() {
+  corner.classList.toggle('in-play', !['title', 'done', 'over'].includes(G.state));
+  // hidden under the settings card, and on the level-done / game-over cards (their buttons must stay)
+  corner.classList.toggle('hidden', !!G.settingsOpen || G.state === 'done' || G.state === 'over');
+}
+
 function drawOverlay() {
   octx.clearRect(0, 0, innerWidth, innerHeight);
   if (G.state === 'play' || G.state === 'intro') input.draw(octx, G.t < 12 && G.levelIdx === 0);
@@ -526,6 +547,7 @@ let last = performance.now();
 function frame(now) {
   const dt = Math.min(1 / 30, (now - last) / 1000); last = now;
   update(dt);
+  syncCorner();
   if (G.state === 'title' && G.world) { // slow attract-mode pan over the level
     const a = G.t * 0.15;
     camTarget.set(G.level.W * T * (0.5 + 0.25 * Math.sin(a)), G.world.maxH - 4, G.level.D * T * (0.5 + 0.25 * Math.cos(a * 0.7)));
