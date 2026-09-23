@@ -109,21 +109,23 @@ export class InputManager {
   }
 
   // Draw the stick on the 2D overlay canvas (ring + thumb, or a resting hint).
+  // `this.style` (set by the game) switches to flat ink colours for the ink art style.
   draw(c, showHint) {
+    const st = this.style;
     if (this.stickActive) {
       c.beginPath();
       c.arc(this.stickBaseX, this.stickBaseY, this.stickRadius, 0, Math.PI * 2);
-      c.fillStyle = 'rgba(40,6,4,0.35)'; c.fill();
-      c.lineWidth = 4; c.strokeStyle = 'rgba(255,120,50,0.55)'; c.stroke();
+      c.fillStyle = st ? st.base : 'rgba(40,6,4,0.35)'; c.globalAlpha = st ? 0.6 : 1; c.fill(); c.globalAlpha = 1;
+      c.lineWidth = st ? 3 : 4; c.strokeStyle = st ? st.ring : 'rgba(255,120,50,0.55)'; c.stroke();
       c.beginPath();
       c.arc(this.stickThumbX, this.stickThumbY, 26, 0, Math.PI * 2);
-      c.fillStyle = 'rgba(255,170,90,0.85)'; c.fill();
-      c.strokeStyle = '#3a0804'; c.stroke();
+      c.fillStyle = st ? st.thumb : 'rgba(255,170,90,0.85)'; c.fill();
+      c.strokeStyle = st ? st.stroke : '#3a0804'; c.stroke();
     } else if (showHint) {
       c.beginPath();
       c.arc(90, innerHeight - 110, 44, 0, Math.PI * 2);
-      c.lineWidth = 3; c.strokeStyle = 'rgba(255,120,50,0.3)'; c.stroke();
-      c.fillStyle = 'rgba(255,170,90,0.35)'; c.font = '600 12px system-ui, sans-serif'; c.textAlign = 'center';
+      c.lineWidth = 3; c.strokeStyle = st ? st.ring : 'rgba(255,120,50,0.3)'; c.stroke();
+      c.fillStyle = st ? st.ring : 'rgba(255,170,90,0.35)'; c.font = '600 12px system-ui, sans-serif'; c.textAlign = 'center';
       c.fillText('DRAG TO ROLL', 90, innerHeight - 106);
     }
   }

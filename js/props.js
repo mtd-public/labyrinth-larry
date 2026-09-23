@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { T } from './world.js';
 import { runeTexture, glowTexture } from './textures.js';
+import { markAccent, inkHide, inkUniform, INK_GLSL } from './ink.js';
 
 const lambert = (color, extra = {}) => new THREE.MeshLambertMaterial({ color, ...extra });
 const IRON = lambert(0x2a2422);
@@ -8,16 +9,18 @@ const glow = glowTexture('rgba(255,210,120,1)', 'rgba(255,60,0,0)');
 const redGlow = glowTexture('rgba(255,80,40,1)', 'rgba(120,0,0,0)');
 const add = (map, color = 0xffffff, opacity = 1) => new THREE.SpriteMaterial({
   map, color, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false });
+const hot = (m) => markAccent(m); // fire-coloured: the ink style's detail colour
 
 // A cluster of additive sprites that flickers like fire.
 class Flame {
   constructor(size = 1, flame = 0xff7a20, core = 0xffe0a0) {
     this.group = new THREE.Group(); this.size = size; this.parts = [];
     for (let k = 0; k < 4; k++) {
-      const s = new THREE.Sprite(add(glow, k ? flame : core, k ? 0.8 : 1));
+      // ink mode: a white-hot core with an accent flicker around it
+      const s = new THREE.Sprite(k ? hot(add(glow, flame, 0.8)) : add(glow, core, 1));
       this.group.add(s); this.parts.push({ s, ph: Math.random() * 6, k });
     }
-    const halo = new THREE.Sprite(add(redGlow, flame, 0.35));
+    const halo = inkHide(new THREE.Sprite(hot(add(redGlow, flame, 0.35))));
     halo.scale.setScalar(size * 3.2); this.group.add(halo); this.halo = halo;
   }
   update(t, intensity = 1) {
@@ -39,7 +42,7 @@ export class Torch {
     const post = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.14, 1.2, 6), IRON); post.position.y = 0.6;
     const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.18, 0.3, 8, 1, true), IRON); bowl.position.y = 1.3;
     bowl.material = new THREE.MeshLambertMaterial({ color: 0x2a2422, side: THREE.DoubleSide });
-    const coals = new THREE.Mesh(new THREE.CircleGeometry(0.38, 8), new THREE.MeshBasicMaterial({ color: theme.flame }));
+    const coals = new THREE.Mesh(new THREE.CircleGeometry(0.38, 8), hot(new THREE.MeshBasicMaterial({ color: theme.flame })));
     coals.rotation.x = -Math.PI / 2; coals.position.y = 1.4;
     for (let k = 0; k < 4; k++) { // horns on the bowl
       const horn = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.35, 5), IRON);
@@ -63,10 +66,11 @@ export class Hellmouth {
     this.pos = pos.clone();
     this.group = new THREE.Group(); this.group.position.copy(pos);
     this.mat = new THREE.ShaderMaterial({
-      uniforms: { uTime: { value: 0 } }, transparent: true,
+      uniforms: { uTime: { value: 0 }, uInk: inkUniform }, transparent: true,
       vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
       fragmentShader: `
-        uniform float uTime; varying vec2 vUv;
+        uniform float uTime; uniform float uInk; varying vec2 vUv;
+        ${INK_GLSL}
         void main() {
           vec2 p = vUv * 2.0 - 1.0; float r = length(p); if (r > 1.0) discard;
           float a = atan(p.y, p.x);
@@ -76,7 +80,7 @@ export class Hellmouth {
           col = mix(col, vec3(0.05, 0.0, 0.0), smoothstep(0.35, 0.9, sw * sw2 + r * 0.4));
           col *= smoothstep(0.0, 0.25, r) * 0.6 + 0.4;       // the throat
           col = mix(vec3(0.0), col, smoothstep(0.05, 0.3, r));
-          gl_FragColor = vec4(col * 1.4, 1.0);
+          gl_FragColor = vec4(inkAccent(col * 1.4), 1.0);
           #include <colorspace_fragment>
         }`,
     });
@@ -98,8 +102,8 @@ export class Hellmouth {
     gr.addColorStop(0, 'rgba(255,40,0,0)'); gr.addColorStop(1, 'rgba(255,60,10,0.55)');
     g.fillStyle = gr; g.fillRect(0, 0, 4, 128);
     const beam = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.7, 14, 20, 1, true),
-      new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(bc), transparent: true, blending: THREE.AdditiveBlending,
-        depthWrite: false, side: THREE.DoubleSide }));
+      hot(new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(bc), transparent: true, blending: THREE.AdditiveBlending,
+        depthWrite: false, side: THREE.DoubleSide })));
     beam.position.y = 7; this.group.add(beam); this.beam = beam;
     this.light = new THREE.PointLight(0xff3010, 30, 16, 1.6); this.light.position.y = 2;
     this.group.add(this.light);
@@ -121,8 +125,8 @@ export class Embers {
     for (let i = 0; i < n; i++) this._reset(i, Math.random() * height);
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(this.pos, 3));
-    this.points = new THREE.Points(g, new THREE.PointsMaterial({ color, size, map: glow, transparent: true,
-      blending: THREE.AdditiveBlending, depthWrite: false }));
+    this.points = new THREE.Points(g, hot(new THREE.PointsMaterial({ color, size, map: glow, transparent: true,
+      blending: THREE.AdditiveBlending, depthWrite: false })));
     this.points.frustumCulled = false;
   }
   _reset(i, y = 0) {
@@ -180,7 +184,7 @@ export class LamentBox {
     this.group = new THREE.Group(); this.group.position.copy(pos);
     this.cube = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.6),
       new THREE.MeshPhongMaterial({ map: lamentTexture(), specular: 0xffd080, shininess: 90, emissive: 0x3a2000 }));
-    const halo = new THREE.Sprite(add(glow, 0xffc050, 0.5)); halo.scale.setScalar(1.8);
+    const halo = inkHide(new THREE.Sprite(add(glow, 0xffc050, 0.5))); halo.scale.setScalar(1.8);
     this.group.add(this.cube, halo);
   }
   update(t) {
@@ -199,14 +203,14 @@ export class OrbMesh {
     const ball = new THREE.Mesh(new THREE.SphereGeometry(r, 18, 14),
       new THREE.MeshPhongMaterial({ color: 0x0a0808, specular: 0x886655, shininess: 100 }));
     this.face = new THREE.Group();
-    const eye = new THREE.MeshBasicMaterial({ color: 0xff2a10 });
+    const eye = hot(new THREE.MeshBasicMaterial({ color: 0xff2a10 }));
     for (const s of [-1, 1]) {
       const e = new THREE.Mesh(new THREE.SphereGeometry(r * 0.13, 8, 6), eye);
       e.position.set(s * r * 0.33, r * 0.2, r * 0.9); e.scale.z = 0.4; this.face.add(e);
     }
     const mouth = new THREE.Mesh(new THREE.TorusGeometry(r * 0.25, r * 0.06, 4, 10, Math.PI), eye);
     mouth.position.set(0, -r * 0.2, r * 0.92); mouth.rotation.z = Math.PI; this.face.add(mouth);
-    const halo = new THREE.Sprite(add(redGlow, 0xff2000, 0.35)); halo.scale.setScalar(r * 3.5);
+    const halo = inkHide(new THREE.Sprite(hot(add(redGlow, 0xff2000, 0.35)))); halo.scale.setScalar(r * 3.5);
     this.group.add(ball, this.face, halo);
   }
 }
@@ -268,7 +272,7 @@ export class Trap {
       }
       this.group.add(this.spikes);
     } else {
-      const grate = new THREE.Mesh(new THREE.CircleGeometry(0.6, 10), new THREE.MeshBasicMaterial({ color: 0x401000 }));
+      const grate = new THREE.Mesh(new THREE.CircleGeometry(0.6, 10), hot(new THREE.MeshBasicMaterial({ color: 0x401000 })));
       grate.rotation.x = -Math.PI / 2; grate.position.y = 0.07; this.grate = grate; this.group.add(grate);
       this.fire = new Flame(1.2); this.group.add(this.fire.group);
       this.column = [];
@@ -417,8 +421,8 @@ export class WindTile {
 const sheenTex = glowTexture('rgba(255,250,200,0.9)', 'rgba(255,220,80,0)');
 export class GreaseTile {
   constructor(pos) {
-    this.mesh = new THREE.Mesh(new THREE.PlaneGeometry(T * 1.1, T * 1.1), new THREE.MeshBasicMaterial({
-      map: sheenTex, color: 0xf0e060, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending, depthWrite: false }));
+    this.mesh = inkHide(new THREE.Mesh(new THREE.PlaneGeometry(T * 1.1, T * 1.1), new THREE.MeshBasicMaterial({
+      map: sheenTex, color: 0xf0e060, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending, depthWrite: false })));
     this.mesh.rotation.x = -Math.PI / 2;
     this.mesh.position.copy(pos); this.mesh.position.y += 0.04;
     this.ph = pos.x * 0.7 + pos.z * 0.3;

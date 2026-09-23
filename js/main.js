@@ -7,6 +7,8 @@ import { SINS } from './sins.js';
 import { InputManager } from './input.js';
 import { Sfx } from './audio.js';
 import { glowTexture } from './textures.js';
+import { InkPass, inkify, inkUniform, INK_PALETTES, inkPalette, applyInkVisibility, inkHide } from './ink.js';
+import { loadSettings, saveSettings, cyclePalette } from './settings.js';
 import { Torch, Hellmouth, Checkpoint, LamentBox, OrbMesh, Hook, Trap, BoneSlab, skullPile, HangingChain, Embers, Coin, WindTile, GreaseTile } from './props.js';
 
 const PLAYER_R = 0.8, ORB_R = 0.6;
@@ -38,7 +40,9 @@ function resize() {
   const hw = w < h ? half : half * w / h, hh = w < h ? half * h / w : half;
   camera.left = -hw; camera.right = hw; camera.top = hh; camera.bottom = -hh;
   camera.updateProjectionMatrix();
+  inkPass.setSize(w, h, dpr);
 }
+const inkPass = new InkPass(renderer);
 addEventListener('resize', resize); resize();
 
 // Ground-plane axes of the screen, for mapping the stick into the world.
@@ -58,8 +62,14 @@ const sfx = new Sfx();
 const larry = new Larry(PLAYER_R);
 scene.add(larry.root);
 const player = new Body(PLAYER_R);
+const shadowTex = glowTexture('rgba(0,0,0,0.75)', 'rgba(0,0,0,0)');
+const inkShadowTex = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const g = c.getContext('2d'); g.fillStyle = '#000'; g.beginPath(); g.arc(32, 32, 30, 0, Math.PI * 2); g.fill();
+  return new THREE.CanvasTexture(c);
+})();
 const shadow = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({
-  map: glowTexture('rgba(0,0,0,0.75)', 'rgba(0,0,0,0)'), transparent: true, depthWrite: false }));
+  map: shadowTex, transparent: true, depthWrite: false }));
 shadow.rotation.x = -Math.PI / 2; scene.add(shadow);
 // a dim warm fill that follows Larry so he always reads against the dark
 const fill = new THREE.PointLight(0xffb070, 14, 7, 1.2); scene.add(fill);
@@ -119,6 +129,8 @@ function loadLevel(idx) {
   respawn(true);
   $('hud-circle').textContent = `CIRCLE ${def.numeral}`;
   $('hud-level').textContent = def.sin.toUpperCase();
+  inkify(scene);
+  applyArt();
 }
 
 function respawn(fresh) {
@@ -163,8 +175,10 @@ function titleCard() {
       <li>Desktop: WASD or arrows. P pauses. M mutes.</li>
     </ul>
     <button class="btn" id="go">DESCEND</button>
-    <div class="levels">${btns}</div>`);
+    <div class="levels">${btns}</div>
+    <button class="btn ghost" id="settings">⚙ SETTINGS</button>`);
   $('go').onclick = () => startGame(0);
+  $('settings').onclick = () => settingsCard(titleCard);
   card.querySelectorAll('[data-lv]').forEach((b) => { b.onclick = () => startGame(+b.dataset.lv); });
 }
 
@@ -231,18 +245,78 @@ function setPaused(p) {
   if (!['play', 'intro', 'dying', 'paused'].includes(G.state)) return;
   if (p && G.state !== 'paused') {
     G.prevState = G.state; G.state = 'paused'; input.reset();
-    showCard(`<h2>PAUSED</h2><p class="tag">Larry screams quietly.</p><button class="btn" id="go">RESUME</button><br><button class="btn ghost" id="menu">MENU</button>`);
-    $('go').onclick = () => setPaused(false);
-    $('menu').onclick = titleCard;
+    pauseCard();
   } else if (!p && G.state === 'paused') {
     G.state = G.prevState; hideCard();
   }
 }
+function pauseCard() {
+  showCard(`<h2>PAUSED</h2><p class="tag">Larry screams quietly.</p><button class="btn" id="go">RESUME</button><br>
+    <button class="btn ghost" id="settings">⚙ SETTINGS</button> <button class="btn ghost" id="menu">MENU</button>`);
+  $('go').onclick = () => setPaused(false);
+  $('settings').onclick = () => settingsCard(pauseCard);
+  $('menu').onclick = titleCard;
+}
+
+// ---------------------------------------------------------------- settings
+const settings = loadSettings();
+sfx.setMuted(settings.muted);
+
+// Push the current art style everywhere: shader switch, post-pass palette,
+// page chrome (CSS tokens) and the thumbstick overlay.
+function applyArt() {
+  const ink = settings.art === 'ink';
+  inkUniform.value = ink ? 1 : 0;
+  const pal = inkPalette(settings.palette);
+  const accent = pal.accent || (G.level ? G.level.accent : '#ff1f2d');
+  inkPass.setPalette(pal, accent);
+  applyInkVisibility(scene);
+  const root = document.documentElement.style;
+  document.body.classList.toggle('ink', ink);
+  root.setProperty('--ink-c', pal.ink); root.setProperty('--paper-c', pal.paper); root.setProperty('--acc-c', accent);
+  input.style = ink ? { base: pal.ink, ring: pal.paper, thumb: pal.paper, stroke: accent } : null;
+  $('mute-btn').classList.toggle('off', sfx.muted);
+}
+
+function settingsCard(back) {
+  const seg = (id, on, label) => `<button class="seg${on ? ' on' : ''}" id="${id}">${label}</button>`;
+  const pals = INK_PALETTES.map((p) => {
+    const acc = p.accent || (G.level ? G.level.accent : '#ff1f2d');
+    return `<button class="swatch${p.id === settings.palette ? ' on' : ''}" data-pal="${p.id}" title="${p.name}">
+      <i style="background:${p.ink}"></i><i style="background:${p.paper}"></i><i style="background:${acc}"></i><span>${p.name}</span></button>`;
+  }).join('');
+  showCard(`
+    <h2>SETTINGS</h2>
+    <div class="set-row"><span class="set-lbl">ART STYLE</span>
+      <div class="segs">${seg('art-classic', settings.art === 'classic', 'HELLFIRE')}${seg('art-ink', settings.art === 'ink', 'SIN CITY')}</div></div>
+    <p class="set-note">${settings.art === 'ink'
+      ? 'Black and white ink, with one detail colour for fire, lava and danger.'
+      : 'Full-colour torchlight over a sea of fire.'}</p>
+    <div class="set-row${settings.art === 'ink' ? '' : ' dim'}"><span class="set-lbl">INK PALETTE <small>(C cycles)</small></span>
+      <div class="swatches">${pals}</div></div>
+    <div class="set-row"><span class="set-lbl">SOUND</span>
+      <div class="segs">${seg('snd-on', !sfx.muted, 'ON')}${seg('snd-off', sfx.muted, 'OFF')}</div></div>
+    <button class="btn" id="done">DONE</button>`);
+  const set = (patch) => { Object.assign(settings, patch); saveSettings(settings); applyArt(); settingsCard(back); };
+  $('art-classic').onclick = () => set({ art: 'classic' });
+  $('art-ink').onclick = () => set({ art: 'ink' });
+  $('snd-on').onclick = () => { sfx.setMuted(false); set({ muted: false }); };
+  $('snd-off').onclick = () => { sfx.setMuted(true); set({ muted: true }); };
+  card.querySelectorAll('[data-pal]').forEach((b) => { b.onclick = () => set({ palette: b.dataset.pal, art: 'ink' }); });
+  $('done').onclick = back;
+  $('done').id = 'go'; // Enter/Space closes it like every other card
+}
+
+$('settings-btn').onclick = () => { setPaused(true); if (G.state === 'paused') settingsCard(pauseCard); };
 $('pause-btn').onclick = () => setPaused(G.state !== 'paused');
-$('mute-btn').onclick = () => { sfx.setMuted(!sfx.muted); $('mute-btn').classList.toggle('off', sfx.muted); };
+$('mute-btn').onclick = () => { sfx.setMuted(!sfx.muted); settings.muted = sfx.muted; saveSettings(settings); applyArt(); };
 input.onKey = (k) => {
   if (k === 'p' || k === 'escape') setPaused(G.state !== 'paused');
   if (k === 'm') $('mute-btn').click();
+  if (k === 'c' && settings.art === 'ink') {
+    cyclePalette(settings, input._keys.has('shift') ? -1 : 1); saveSettings(settings); applyArt();
+    showToast(inkPalette(settings.palette).name.toUpperCase(), 0.9);
+  }
   if ((k === 'enter' || k === ' ') && !screen.classList.contains('hidden')) $('go')?.click();
 };
 document.addEventListener('visibilitychange', () => { if (document.hidden) setPaused(true); });
@@ -415,8 +489,11 @@ function update(dt) {
   shadow.visible = gh !== null && larry.root.visible && player.y - gh < 12;
   if (shadow.visible) {
     const k = Math.max(0.3, 1 - (player.y - gh) / 10);
-    shadow.position.set(player.x, gh + 0.05, player.z); shadow.scale.setScalar(k);
-    shadow.material.opacity = k;
+    // ink mode: a big hard-edged black pool, so white Larry reads against any floor
+    const ink = settings.art === 'ink';
+    shadow.material.map = ink ? inkShadowTex : shadowTex;
+    shadow.position.set(player.x, gh + 0.05, player.z); shadow.scale.setScalar(k * (ink ? 1.35 : 1));
+    shadow.material.opacity = ink ? 1 : k;
   }
 
   fill.position.set(player.x + 1.5, player.y + 3, player.z + 1.5);
@@ -454,7 +531,8 @@ function frame(now) {
     camTarget.set(G.level.W * T * (0.5 + 0.25 * Math.sin(a)), G.world.maxH - 4, G.level.D * T * (0.5 + 0.25 * Math.cos(a * 0.7)));
     placeCamera();
   }
-  renderer.render(scene, camera);
+  if (settings.art === 'ink') inkPass.render(scene, camera, G.t);
+  else renderer.render(scene, camera);
   drawOverlay();
   requestAnimationFrame(frame);
 }
@@ -464,4 +542,4 @@ titleCard();
 requestAnimationFrame(frame);
 
 // test hook for automated checks
-window.__game = { G, player, loadLevel, startGame, die, camera, larry };
+window.__game = { G, player, loadLevel, startGame, die, camera, larry, settings, applyArt };
